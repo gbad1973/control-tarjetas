@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista de Movimientos - Control de Tarjetas</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: linear-gradient(to right, #4f46e5, #7c3aed);
+            color: white;
+            border-radius: 20px 20px 0 0;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            color: white;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(to right, #4f46e5, #7c3aed);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.3);
+        }
+        
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+        
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+        
+        .btn-edit {
+            background: linear-gradient(to right, #4f46e5, #7c3aed);
+            color: white;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+        }
+        
+        .btn-delete {
+            background: linear-gradient(to right, #ef4444, #f87171);
+            color: white;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+        }
+        
+        .btn-filtrar {
+            background: linear-gradient(to right, #4f46e5, #7c3aed);
+            color: white;
+            padding: 8px 20px;
+        }
+        
+        .btn-limpiar {
+            background: #f3f4f6;
+            color: #6b7280;
+            padding: 8px 20px;
+        }
+        
+        .movimientos-table {
+            background: white;
+            border-radius: 0 0 20px 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th {
+            background: #1e40af;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #1e3a8a;
+        }
+        
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #f3f4f6;
+            color: #1f2937;
+        }
+        
+        tr:hover {
+            background: #f9fafb;
+        }
+        
+        .tipo-compra {
+            background: #fef3c7;
+            color: #92400e;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .tipo-pago {
+            background: #dcfce7;
+            color: #065f46;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .tipo-cashback {
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .tipo-comision {
+            background: #fee2e2;
+            color: #7f1d1d;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .tipo-interes {
+            background: #f3e8ff;
+            color: #5b21b6;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .monto-positivo {
+            color: #10b981;
+            font-weight: 600;
+        }
+        
+        .monto-negativo {
+            color: #ef4444;
+            font-weight: 600;
+        }
+        
+        .cashback-badge {
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .acciones {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6b7280;
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        
+        .filtros {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        
+        .filtro-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            flex: 1;
+            min-width: 150px;
+        }
+        
+        .filtro-item label {
+            font-size: 0.9rem;
+            color: #4f46e5;
+            font-weight: 600;
+        }
+        
+        .filtro-item select, .filtro-item input {
+            padding: 8px 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            background: white;
+            width: 100%;
+        }
+        
+        .filtro-item select:focus, .filtro-item input:focus {
+            outline: none;
+            border-color: #4f46e5;
+        }
+        
+        .filtro-buscar {
+            flex: 2;
+            min-width: 200px;
+        }
+        
+        .filtro-buscar input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+        }
+        
+        .filtro-buscar input:focus {
+            outline: none;
+            border-color: #4f46e5;
+        }
+        
+        .filtro-acciones {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-left: auto;
+        }
+        
+        .contador-resultados {
+            font-size: 0.85rem;
+            color: #4f46e5;
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: #f8fafc;
+            border-radius: 8px;
+            display: inline-block;
+        }
+        
+        @media (max-width: 768px) {
+            .header-actions {
+                flex-direction: column;
+                gap: 15px;
+                align-items: stretch;
+            }
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .movimientos-table {
+                padding: 20px;
+            }
+            
+            .acciones {
+                flex-direction: column;
+            }
+            
+            .filtros {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filtro-item select {
+                width: 100%;
+            }
+            
+            .filtro-buscar {
+                max-width: 100%;
+            }
+            
+            .filtro-acciones {
+                margin-left: 0;
+                width: 100%;
+            }
+            
+            .filtro-acciones button {
+                flex: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💰 Movimientos Registrados</h1>
+            <p style="color: rgba(255, 255, 255, 0.9);">Gestión completa de todos los movimientos en el sistema</p>
+            
+            <div class="header-actions">
+                <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                    ← Volver al Dashboard
+                </a>
+                <a href="{% url 'nuevo_movimiento' %}" class="btn btn-primary">
+                    ➕ Agregar Nuevo Movimiento
+                </a>
+            </div>
+        </div>
+        
+        <div class="movimientos-table">
+            <!-- FILTROS MEJORADOS - COLOR AZUL -->
+            <form id="filtrosForm" method="get" action="">
+                <div class="filtros">
+                    <div class="filtro-buscar">
+                        <label for="buscar">🔍 Buscar</label>
+                        <input type="text" id="buscar" name="buscar" placeholder="Descripción, establecimiento, persona, tarjeta..." value="{{ request.GET.buscar }}">
+                    </div>
+                    
+                    <div class="filtro-item">
+                        <label for="filtro-tipo">📌 Tipo</label>
+                        <select id="filtro-tipo" name="tipo">
+                            <option value="">Todos los tipos</option>
+                            <option value="COMPRA" {% if request.GET.tipo == 'COMPRA' %}selected{% endif %}>Compra</option>
+                            <option value="PAGO" {% if request.GET.tipo == 'PAGO' %}selected{% endif %}>Pago</option>
+                            <option value="CASHBACK" {% if request.GET.tipo == 'CASHBACK' %}selected{% endif %}>Cashback</option>
+                            <option value="COMISION" {% if request.GET.tipo == 'COMISION' %}selected{% endif %}>Comisión</option>
+                            <option value="INTERES" {% if request.GET.tipo == 'INTERES' %}selected{% endif %}>Interés</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filtro-item">
+                        <label for="filtro-persona">👤 Persona</label>
+                        <select id="filtro-persona" name="persona">
+                            <option value="">Todas las personas</option>
+                            {% for persona in personas %}
+                            <option value="{{ persona.id }}" {% if request.GET.persona == persona.id|stringformat:"s" %}selected{% endif %}>{{ persona.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="filtro-item">
+                        <label for="filtro-tarjeta">💳 Tarjeta</label>
+                        <select id="filtro-tarjeta" name="tarjeta">
+                            <option value="">Todas las tarjetas</option>
+                            {% for tarjeta in tarjetas %}
+                            <option value="{{ tarjeta.id }}" {% if request.GET.tarjeta == tarjeta.id|stringformat:"s" %}selected{% endif %}>{{ tarjeta.banco }} - ****{{ tarjeta.numero|slice:"-4:" }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- FILTROS DE FECHA -->
+                    <div class="filtro-item">
+                        <label for="fecha_desde">📅 Desde</label>
+                        <input type="date" id="fecha_desde" name="fecha_desde" value="{{ request.GET.fecha_desde }}">
+                    </div>
+                    
+                    <div class="filtro-item">
+                        <label for="fecha_hasta">📅 Hasta</label>
+                        <input type="date" id="fecha_hasta" name="fecha_hasta" value="{{ request.GET.fecha_hasta }}">
+                    </div>
+                    
+                    <div class="filtro-acciones">
+                        <button type="submit" class="btn btn-filtrar">
+                            🔍 Buscar
+                        </button>
+                        <a href="{% url 'lista_movimientos' %}" class="btn btn-limpiar">
+                            🧹 Limpiar
+                        </a>
+                    </div>
+                </div>
+            </form>
+            
+            <!-- CONTADOR DE RESULTADOS -->
+            <div class="contador-resultados">
+                📊 Mostrando {{ movimientos|length }} movimientos
+                {% if request.GET.buscar or request.GET.tipo or request.GET.persona or request.GET.tarjeta or request.GET.fecha_desde or request.GET.fecha_hasta %}
+                    <span style="color: #4f46e5; font-weight: 600;">(Filtros aplicados)</span>
+                {% endif %}
+            </div>
+            
+            {% if movimientos %}
+            <table id="tabla-movimientos">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Persona</th>
+                        <th>Tarjeta</th>
+                        <th>Establecimiento</th>
+                        <th>Tipo</th>
+                        <th>Descripción</th>
+                        <th>Monto</th>
+                        <th>Cashback</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for movimiento in movimientos %}
+                    <tr>
+                        <td>{{ movimiento.fecha|date:"d/m/Y" }}</td>
+                        <td>{{ movimiento.persona.nombre }}</td>
+                        <td>{{ movimiento.tarjeta.banco }} - ****{{ movimiento.tarjeta.numero|slice:"-4:" }}</td>
+                        <td>{% if movimiento.establecimiento %}{{ movimiento.establecimiento.nombre }}{% else %}-{% endif %}</td>
+                        <td>
+                            <span class="tipo-{{ movimiento.tipo|lower }}">
+                                {{ movimiento.get_tipo_display }}
+                            </span>
+                        </td>
+                        <td>{{ movimiento.descripcion|truncatechars:30 }}</td>
+                        <td class="{% if movimiento.tipo in 'PAGO,CASHBACK' %}monto-positivo{% else %}monto-negativo{% endif %}">
+                            ${{ movimiento.monto|floatformat:2 }}
+                        </td>
+                        <td>
+                            {% if movimiento.monto_cashback > 0 %}
+                                <span class="cashback-badge">💰 ${{ movimiento.monto_cashback|floatformat:2 }}</span>
+                            {% else %}
+                                <span style="color: #9ca3af;">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="acciones">
+                                <a href="{% url 'editar_movimiento' movimiento.id %}" class="btn btn-edit">
+                                    ✏️ Editar
+                                </a>
+                                <a href="{% url 'eliminar_movimiento' movimiento.id %}" class="btn btn-delete">
+                                    🗑️ Eliminar
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <div style="font-size: 5rem; margin-bottom: 20px; opacity: 0.3;">💰</div>
+                <h2 style="color: #6b7280; margin-bottom: 10px;">
+                    {% if request.GET.buscar or request.GET.tipo or request.GET.persona or request.GET.tarjeta or request.GET.fecha_desde or request.GET.fecha_hasta %}
+                        No se encontraron movimientos con los filtros aplicados
+                    {% else %}
+                        No hay movimientos registrados
+                    {% endif %}
+                </h2>
+                <p style="color: #9ca3af; margin-bottom: 30px;">
+                    {% if request.GET.buscar or request.GET.tipo or request.GET.persona or request.GET.tarjeta or request.GET.fecha_desde or request.GET.fecha_hasta %}
+                        <a href="{% url 'lista_movimientos' %}" class="btn btn-secondary">🧹 Limpiar filtros</a>
+                    {% else %}
+                        Comienza agregando el primer movimiento
+                    {% endif %}
+                </p>
+                <a href="{% url 'nuevo_movimiento' %}" class="btn btn-primary" style="width: auto; display: inline-flex;">
+                    ➕ Agregar Nuevo Movimiento
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <script>
+        // Buscar al presionar Enter
+        document.getElementById('buscar').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('filtrosForm').submit();
+            }
+        });
+    </script>
+</body>
+</html>

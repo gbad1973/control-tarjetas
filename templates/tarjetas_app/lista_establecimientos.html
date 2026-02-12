@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista de Establecimientos - Control de Tarjetas</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: linear-gradient(to right, #4f46e5, #7c3aed);
+            color: white;
+            border-radius: 20px 20px 0 0;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            color: white;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(to right, #4f46e5, #7c3aed);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+        }
+        
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+        
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+        
+        .btn-edit {
+            background: linear-gradient(to right, #4f46e5, #7c3aed);
+            color: white;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+        }
+        
+        .btn-delete {
+            background: linear-gradient(to right, #ef4444, #f87171);
+            color: white;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+        }
+        
+        .establecimientos-table {
+            background: white;
+            border-radius: 0 0 20px 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th {
+            background: #1e40af;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #1e3a8a;
+        }
+        
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #f3f4f6;
+            color: #1f2937;
+        }
+        
+        tr:hover {
+            background: #f9fafb;
+        }
+        
+        .cashback-badge {
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .estado-activo {
+            background: #dcfce7;
+            color: #065f46;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .estado-inactivo {
+            background: #fee2e2;
+            color: #7f1d1d;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .acciones {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6b7280;
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        
+        @media (max-width: 768px) {
+            .header-actions {
+                flex-direction: column;
+                gap: 15px;
+                align-items: stretch;
+            }
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .establecimientos-table {
+                padding: 20px;
+            }
+            
+            .acciones {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏪 Establecimientos Registrados</h1>
+            <p>Gestión completa de todos los establecimientos en el sistema</p>
+            
+            <div class="header-actions">
+                <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                    ← Volver al Dashboard
+                </a>
+                <a href="{% url 'nuevo_establecimiento' %}" class="btn btn-primary">
+                    ➕ Agregar Nuevo Establecimiento
+                </a>
+            </div>
+        </div>
+        
+        <div class="establecimientos-table">
+            {% if establecimientos %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Descripción</th>
+                        <th>Cashback</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for establecimiento in establecimientos %}
+                    <tr>
+                        <td>{{ establecimiento.nombre }}</td>
+                        <td>{{ establecimiento.descripcion|truncatechars:50|default:"-" }}</td>
+                        <td>
+                            {% if establecimiento.porcentaje_cashback > 0 %}
+                                <span class="cashback-badge">💰 {{ establecimiento.porcentaje_cashback }}%</span>
+                            {% else %}
+                                <span style="color: #9ca3af;">0%</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if establecimiento.activo %}
+                                <span class="estado-activo">✅ Activo</span>
+                            {% else %}
+                                <span class="estado-inactivo">❌ Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="acciones">
+                                <a href="{% url 'editar_establecimiento' establecimiento.id %}" class="btn btn-edit">
+                                    ✏️ Editar
+                                </a>
+                                <a href="{% url 'eliminar_establecimiento' establecimiento.id %}" class="btn btn-delete">
+                                    🗑️ Eliminar
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <div style="font-size: 5rem; margin-bottom: 20px; opacity: 0.3;">🏪</div>
+                <h2 style="color: #6b7280; margin-bottom: 10px;">No hay establecimientos registrados</h2>
+                <p style="color: #9ca3af; margin-bottom: 30px;">Comienza agregando el primer establecimiento</p>
+                <a href="{% url 'nuevo_establecimiento' %}" class="btn btn-primary" style="width: auto; display: inline-flex;">
+                    ➕ Agregar Primer Establecimiento
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

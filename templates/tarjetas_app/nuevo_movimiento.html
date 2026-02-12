@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nuevo Movimiento - Control de Tarjetas</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        .container { background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); width: 100%; max-width: 700px; overflow: hidden; }
+        .header { background: linear-gradient(to right, #667eea, #764ba2); color: white; padding: 30px; text-align: center; }
+        .header h1 { font-size: 2.2rem; margin-bottom: 10px; }
+        .form-container { padding: 40px; }
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 30px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group.full-width { grid-column: span 2; }
+        label { color: #4f46e5; font-weight: 600; margin-bottom: 8px; font-size: 0.95rem; }
+        .form-control { padding: 14px 16px; border: 2px solid #e5e7eb; border-radius: 12px; font-size: 1rem; transition: all 0.3s ease; background: #f9fafb; }
+        select.form-control { width: 100%; }
+        textarea.form-control { min-height: 100px; resize: vertical; }
+        .form-control:focus { outline: none; border-color: #4f46e5; background: white; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+        .form-control:disabled { background: #f1f5f9; opacity: 0.6; cursor: not-allowed; }
+        .form-actions { display: flex; gap: 15px; justify-content: flex-end; border-top: 1px solid #e5e7eb; padding-top: 30px; margin-top: 20px; }
+        .btn { padding: 14px 32px; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease; }
+        .btn-primary { background: linear-gradient(to right, #4f46e5, #764ba2); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(79, 70, 229, 0.3); }
+        .btn-secondary { background: #f3f4f6; color: #6b7280; }
+        .btn-secondary:hover { background: #e5e7eb; }
+        .required-field::after { content: " *"; color: #ef4444; font-weight: bold; }
+        .opcional-field::after { content: " (opcional)"; color: #6b7280; font-size: 0.8rem; font-weight: normal; }
+        .estado-info { font-size: 0.8rem; margin-top: 4px; color: #6b7280; }
+        @media (max-width: 768px) {
+            .form-grid { grid-template-columns: 1fr; }
+            .form-group.full-width { grid-column: span 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💰 Nuevo Movimiento</h1>
+            <p>Registra un nuevo movimiento en tarjeta de crédito</p>
+        </div>
+        
+        <div class="form-container">
+            <form method="post" id="movimientoForm">
+                {% csrf_token %}
+                
+                <div class="form-grid">
+                    <!-- ORDEN: Tarjeta, Persona, Tipo, Establecimiento -->
+                    <div class="form-group">
+                        <label for="id_tarjeta" class="required-field">Tarjeta</label>
+                        {{ form.tarjeta }}
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_persona" class="required-field">Persona</label>
+                        {{ form.persona }}
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_tipo" class="required-field">Tipo de movimiento</label>
+                        {{ form.tipo }}
+                    </div>
+                    
+                    <div class="form-group" id="establecimiento-group">
+                        <label for="id_establecimiento" id="establecimiento-label">Establecimiento</label>
+                        {{ form.establecimiento }}
+                        <div class="estado-info" id="establecimiento-info"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_monto" class="required-field">Monto ($)</label>
+                        {{ form.monto }}
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_fecha" class="required-field">Fecha</label>
+                        {{ form.fecha }}
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="id_descripcion">Descripción</label>
+                        {{ form.descripcion }}
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                        ← Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        💾 Guardar Movimiento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const tipoSelect = document.getElementById('id_tipo');
+            const establecimientoGroup = document.getElementById('establecimiento-group');
+            const establecimientoSelect = document.getElementById('id_establecimiento');
+            const establecimientoLabel = document.getElementById('establecimiento-label');
+            const establecimientoInfo = document.getElementById('establecimiento-info');
+            
+            // Guardar el valor original del select cuando se deshabilita
+            let valorOriginal = '';
+            
+            function actualizarEstablecimiento() {
+                const tipo = tipoSelect.value;
+                
+                if (tipo === 'COMPRA') {
+                    // ✅ HABILITADO - COMPRA: Requiere establecimiento
+                    establecimientoSelect.disabled = false;
+                    establecimientoSelect.required = true;
+                    establecimientoGroup.style.opacity = '1';
+                    establecimientoLabel.className = 'required-field';
+                    establecimientoLabel.innerHTML = 'Establecimiento';
+                    establecimientoInfo.innerHTML = 'Selecciona el establecimiento de la compra';
+                    establecimientoInfo.style.color = '#10b981';
+                    
+                    // Restaurar el valor guardado si existe
+                    if (valorOriginal) {
+                        establecimientoSelect.value = valorOriginal;
+                    }
+                } else {
+                    // ❌ DESHABILITADO - PAGO/OTROS: No requiere establecimiento
+                    // Guardar el valor actual antes de deshabilitar
+                    if (establecimientoSelect.value) {
+                        valorOriginal = establecimientoSelect.value;
+                    }
+                    
+                    establecimientoSelect.disabled = true;
+                    establecimientoSelect.required = false;
+                    establecimientoSelect.value = ''; // Limpiar el valor
+                    establecimientoGroup.style.opacity = '0.8';
+                    establecimientoLabel.className = 'opcional-field';
+                    establecimientoLabel.innerHTML = 'Establecimiento (no requerido)';
+                    establecimientoInfo.innerHTML = 'No aplica para este tipo de movimiento';
+                    establecimientoInfo.style.color = '#6b7280';
+                }
+            }
+            
+            // Ejecutar al cargar
+            actualizarEstablecimiento();
+            
+            // Ejecutar cada vez que cambie el tipo
+            tipoSelect.addEventListener('change', actualizarEstablecimiento);
+            
+            // Validar antes de enviar
+            document.getElementById('movimientoForm').addEventListener('submit', function(e) {
+                const tipo = tipoSelect.value;
+                const establecimiento = establecimientoSelect.value;
+                
+                if (tipo === 'COMPRA' && !establecimiento) {
+                    e.preventDefault();
+                    alert('⚠️ Debes seleccionar un establecimiento para registrar una compra');
+                    establecimientoSelect.focus();
+                    return false;
+                }
+                
+                return true;
+            });
+        });
+    </script>
+</body>
+</html>

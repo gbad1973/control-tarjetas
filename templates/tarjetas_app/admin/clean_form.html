@@ -1,0 +1,136 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    /* OCULTA TODO EL PANEL LATERAL Y NAVEGACIÓN */
+    #nav-sidebar, 
+    #header, 
+    #user-tools, 
+    .breadcrumbs,
+    #toggle-nav-sidebar {
+        display: none !important;
+    }
+    
+    /* FORMULARIO LIMPIO Y CENTRADO */
+    #content {
+        margin: 0 !important;
+        padding: 40px 20px !important;
+        width: 100% !important;
+        max-width: 800px;
+        margin: 0 auto !important;
+    }
+    
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+    
+    #container {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        width: 100%;
+        max-width: 800px;
+        overflow: hidden;
+    }
+    
+    #content-main {
+        padding: 30px;
+    }
+    
+    h1 {
+        color: #333;
+        text-align: center;
+        margin-bottom: 30px;
+        font-size: 28px;
+        font-weight: 600;
+    }
+    
+    .form-row {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        border-left: 4px solid #667eea;
+    }
+    
+    label {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 8px;
+        display: block;
+    }
+    
+    input, select, textarea {
+        width: 100%;
+        padding: 12px 15px;
+        border: 2px solid #e1e5e9;
+        border-radius: 8px;
+        font-size: 16px;
+        transition: all 0.3s;
+    }
+    
+    input:focus, select:focus, textarea:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        outline: none;
+    }
+    
+    .submit-row {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        margin-top: 30px;
+        padding-top: 25px;
+        border-top: 1px solid #eee;
+    }
+    
+    .submit-row input[type="submit"] {
+        width: auto;
+        padding: 12px 30px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        font-size: 16px;
+    }
+    
+    input[type="submit"][name="_save"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    input[type="submit"][name="_save"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    }
+    
+    /* Selector múltiple mejorado */
+    .selector {
+        display: flex;
+        gap: 20px;
+    }
+    
+    .selector select {
+        height: 250px;
+    }
+    
+    .selector-available, .selector-chosen {
+        flex: 1;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <h1>{% if add %}Agregar Nueva Tarjeta{% else %}Editar Tarjeta{% endif %}</h1>
+    {{ block.super }}
+</div>
+{% endblock %}

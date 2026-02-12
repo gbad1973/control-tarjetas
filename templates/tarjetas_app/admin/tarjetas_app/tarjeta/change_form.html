@@ -1,0 +1,22 @@
+{% extends "admin/change_form.html" %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    /* OCULTA SOLO LA BARRA LATERAL */
+    #nav-sidebar {
+        display: none !important;
+    }
+    
+    /* EL CONTENIDO OCUPA TODO EL ESPACIO */
+    #content {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+    
+    /* OCULTA EL BOTÓN DE TOGGLE */
+    #toggle-nav-sidebar {
+        display: none !important;
+    }
+</style>
+{% endblock %}

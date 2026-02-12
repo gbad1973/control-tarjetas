@@ -1,0 +1,22 @@
+{% extends "admin/base_site.html" %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    /* OCULTA LA BARRA LATERAL EN TODAS LAS PÁGINAS DEL ADMIN */
+    #nav-sidebar {
+        display: none !important;
+    }
+    
+    /* CONTENIDO AL 100% */
+    #content {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+    
+    /* OCULTA EL TOGGLE */
+    #toggle-nav-sidebar {
+        display: none !important;
+    }
+</style>
+{% endblock %}

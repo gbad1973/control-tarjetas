@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movimientos de {{ tarjeta.banco }} - Control de Tarjetas</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); padding: 25px; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .header h1 { color: #1f2937; font-size: 1.5rem; font-weight: 600; }
+        .btn { padding: 8px 16px; border: none; border-radius: 8px; font-weight: 500; font-size: 0.85rem; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s ease; }
+        .btn-primary { background: linear-gradient(to right, #4f46e5, #7c3aed); color: white; }
+        .btn-success { background: linear-gradient(to right, #10b981, #34d399); color: white; }
+        .btn-danger { background: linear-gradient(to right, #ef4444, #f87171); color: white; }
+        .btn-secondary { background: #f3f4f6; color: #6b7280; }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(79,70,229,0.2); }
+        
+        .tarjeta-seleccionada { background: linear-gradient(135deg, #1e293b, #334155); color: white; border-radius: 10px; padding: 15px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .tarjeta-info-detalle { display: flex; flex-direction: column; gap: 3px; }
+        .tarjeta-nombre { font-size: 1.1rem; font-weight: 600; }
+        .tarjeta-numero { font-family: 'Courier New', monospace; font-size: 0.9rem; opacity: 0.9; }
+        .tarjeta-saldo { display: flex; gap: 20px; }
+        .saldo-item { display: flex; flex-direction: column; align-items: flex-end; }
+        .saldo-label { font-size: 0.65rem; opacity: 0.8; text-transform: uppercase; }
+        .saldo-value { font-size: 1rem; font-weight: 600; }
+        
+        .filtros { background: #f8fafc; border-radius: 10px; padding: 15px; margin-bottom: 20px; display: flex; gap: 15px; align-items: flex-end; border: 1px solid #e5e7eb; flex-wrap: wrap; }
+        .filtro-group { display: flex; flex-direction: column; flex: 1; min-width: 140px; }
+        .filtro-group label { color: #4f46e5; font-weight: 600; margin-bottom: 5px; font-size: 0.8rem; }
+        .form-control { padding: 8px 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 0.85rem; width: 100%; }
+        .form-control:focus { outline: none; border-color: #4f46e5; }
+        
+        .resumen { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        .resumen-card { background: white; border-radius: 10px; padding: 12px 15px; border: 1px solid #e5e7eb; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .cargos { border-top: 3px solid #ef4444; }
+        .abonos { border-top: 3px solid #10b981; }
+        .saldo { border-top: 3px solid #4f46e5; }
+        .resumen-card h3 { font-size: 0.8rem; color: #6b7280; margin-bottom: 5px; display: flex; align-items: center; gap: 5px; }
+        .total-cargos { color: #ef4444; font-size: 1.3rem; font-weight: 700; }
+        .total-abonos { color: #10b981; font-size: 1.3rem; font-weight: 700; }
+        .total-saldo { color: #4f46e5; font-size: 1.3rem; font-weight: 700; }
+        
+        .tabla-container { overflow-x: auto; margin-top: 15px; border-radius: 10px; border: 1px solid #e5e7eb; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th { background: #1e40af; color: white; padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e3a8a; }
+        td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; }
+        tr:hover { background: #f1f5f9; }
+        .badge { padding: 4px 10px; border-radius: 16px; font-size: 0.7rem; font-weight: 600; display: inline-block; }
+        .badge-cargo { background: #fee2e2; color: #7f1d1d; }
+        .badge-abono { background: #dcfce7; color: #14532d; }
+        .monto-cargo { color: #ef4444; font-weight: 600; }
+        .monto-abono { color: #10b981; font-weight: 600; }
+        .text-right { text-align: right; }
+        
+        .acciones { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap; }
+        
+        @media print {
+            body { background: white; padding: 0.5in; }
+            .container { box-shadow: none; padding: 0; }
+            .btn, .acciones, .filtros, .resumen, .header a, [class*="btn"] { display: none !important; }
+            .header h1 { display: block !important; font-size: 16pt; color: black; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
+            .tabla-container { border: none; }
+            th { background: #f0f0f0 !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+        
+        @media (max-width: 768px) {
+            .resumen { grid-template-columns: 1fr; }
+            .filtros { flex-direction: column; }
+            .tarjeta-seleccionada { flex-direction: column; align-items: flex-start; }
+            .tarjeta-saldo { flex-direction: column; gap: 8px; width: 100%; }
+            .saldo-item { align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💳 Movimientos - {{ tarjeta.banco }} (****{{ tarjeta.numero|slice:"-4:" }})</h1>
+            <div>
+                <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                    ← Dashboard
+                </a>
+            </div>
+        </div>
+        
+        <!-- Tarjeta seleccionada -->
+        <div class="tarjeta-seleccionada">
+            <div class="tarjeta-info-detalle">
+                <div class="tarjeta-nombre">{{ tarjeta.banco }} - {{ tarjeta.get_tipo_display }}</div>
+                <div class="tarjeta-numero">{{ tarjeta.numero }}</div>
+            </div>
+            <div class="tarjeta-saldo">
+                <div class="saldo-item">
+                    <span class="saldo-label">Límite</span>
+                    <span class="saldo-value">${{ tarjeta.limite_credito|floatformat:0 }}</span>
+                </div>
+                <div class="saldo-item">
+                    <span class="saldo-label">Saldo</span>
+                    <span class="saldo-value">${{ tarjeta.saldo_actual|floatformat:0 }}</span>
+                </div>
+                <div class="saldo-item">
+                    <span class="saldo-label">Disponible</span>
+                    <span class="saldo-value">${{ tarjeta.saldo_disponible|floatformat:0 }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- FILTROS POR FECHA -->
+        <form method="get" class="filtros" id="filtrosForm">
+            <input type="hidden" name="tarjeta" value="{{ tarjeta.id }}">
+            
+            <div class="filtro-group">
+                <label>📅 Desde</label>
+                <input type="date" name="fecha_desde" class="form-control" value="{{ request.GET.fecha_desde }}">
+            </div>
+            
+            <div class="filtro-group">
+                <label>📅 Hasta</label>
+                <input type="date" name="fecha_hasta" class="form-control" value="{{ request.GET.fecha_hasta }}">
+            </div>
+            
+            <div class="filtro-group" style="flex: 0.4;">
+                <label>&nbsp;</label>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    🔍 Filtrar
+                </button>
+            </div>
+            
+            <div class="filtro-group" style="flex: 0.4;">
+                <label>&nbsp;</label>
+                <a href="{% url 'movimientos_tarjeta' tarjeta.id %}" class="btn btn-secondary" style="width: 100%;">
+                    🧹 Limpiar
+                </a>
+            </div>
+        </form>
+        
+        <!-- RESUMEN DE CARGOS Y ABONOS -->
+        <div class="resumen">
+            <div class="resumen-card cargos">
+                <h3>💰 Cargos</h3>
+                <div class="total-cargos" id="totalCargos">$0</div>
+            </div>
+            <div class="resumen-card abonos">
+                <h3>💵 Abonos</h3>
+                <div class="total-abonos" id="totalAbonos">$0</div>
+            </div>
+            <div class="resumen-card saldo">
+                <h3>⚖️ Saldo</h3>
+                <div class="total-saldo" id="totalSaldo">$0</div>
+            </div>
+        </div>
+        
+        <!-- BOTONES DE EXPORTACIÓN -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h2 style="color: #1f2937; font-size: 1rem; font-weight: 600;">📋 Todos los movimientos</h2>
+            <div style="display: flex; gap: 8px;">
+                <button onclick="exportarExcel()" class="btn btn-success" type="button">
+                    📊 Excel
+                </button>
+                <button onclick="exportarPDF()" class="btn btn-danger" type="button">
+                    📄 PDF
+                </button>
+            </div>
+        </div>
+        
+        <!-- TABLA DE MOVIMIENTOS - CON COLUMNA PERSONA -->
+        <div class="tabla-container">
+            <table id="tablaMovimientos">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Persona</th>
+                        <th>Tarjeta</th>
+                        <th>Tipo</th>
+                        <th>Establecimiento</th>
+                        <th>Descripción</th>
+                        <th class="text-right">Cargo</th>
+                        <th class="text-right">Abono</th>
+                        <th class="text-right">Saldo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for movimiento in movimientos %}
+                    <tr>
+                        <td>{{ movimiento.fecha|date:"d/m/Y" }}</td>
+                        <td>{{ movimiento.persona.nombre }}</td>
+                        <td>{{ movimiento.tarjeta.banco }}</td>
+                        <td>
+                            <span class="badge {% if movimiento.es_cargo %}badge-cargo{% else %}badge-abono{% endif %}">
+                                {{ movimiento.get_tipo_display|slice:":4" }}
+                            </span>
+                        </td>
+                        <td>{{ movimiento.establecimiento.nombre|default:"-"|truncatechars:15 }}</td>
+                        <td>{{ movimiento.descripcion|truncatechars:25 }}</td>
+                        <td class="text-right monto-cargo">{% if movimiento.es_cargo %}${{ movimiento.monto|floatformat:2 }}{% endif %}</td>
+                        <td class="text-right monto-abono">{% if movimiento.es_abono %}${{ movimiento.monto|floatformat:2 }}{% endif %}</td>
+                        <td class="text-right {% if movimiento.saldo_corriente > 0 %}monto-cargo{% else %}monto-abono{% endif %}">${{ movimiento.saldo_corriente|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" style="text-align: center; padding: 30px; color: #6b7280;">
+                            <span style="font-size: 2rem; display: block; margin-bottom: 10px;">📭</span>
+                            <p>No hay movimientos en esta tarjeta</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot style="background: #f8fafc; font-weight: 600; font-size: 0.8rem;">
+                    <tr>
+                        <td colspan="6" style="text-align: right;">Totales:</td>
+                        <td class="text-right monto-cargo" id="totalCargoColumna">$0.00</td>
+                        <td class="text-right monto-abono" id="totalAbonoColumna">$0.00</td>
+                        <td class="text-right" id="totalSaldoColumna">$0.00</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        
+        <div class="acciones">
+            <a href="{% url 'dashboard' %}" class="btn btn-primary">
+                🏠 Dashboard
+            </a>
+        </div>
+    </div>
+    
+    <script>
+        // Calcular totales
+        function calcularTotales() {
+            let totalCargos = 0, totalAbonos = 0, saldo = 0;
+            {% for movimiento in movimientos %}
+                {% if movimiento.es_cargo %}
+                    totalCargos += {{ movimiento.monto|floatformat:2 }};
+                    saldo += {{ movimiento.monto|floatformat:2 }};
+                {% elif movimiento.es_abono %}
+                    totalAbonos += {{ movimiento.monto|floatformat:2 }};
+                    saldo -= {{ movimiento.monto|floatformat:2 }};
+                {% endif %}
+            {% endfor %}
+            
+            const formatearMoneda = (n) => '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            document.getElementById('totalCargos').textContent = formatearMoneda(totalCargos);
+            document.getElementById('totalAbonos').textContent = formatearMoneda(totalAbonos);
+            document.getElementById('totalSaldo').textContent = formatearMoneda(saldo);
+            document.getElementById('totalCargoColumna').textContent = formatearMoneda(totalCargos);
+            document.getElementById('totalAbonoColumna').textContent = formatearMoneda(totalAbonos);
+            document.getElementById('totalSaldoColumna').textContent = formatearMoneda(saldo);
+        }
+        
+        // EXPORTAR A EXCEL
+        function exportarExcel() {
+            let datos = [];
+            let encabezados = ['Fecha', 'Persona', 'Tarjeta', 'Tipo', 'Establecimiento', 'Descripción', 'Cargo', 'Abono', 'Saldo'];
+            datos.push(encabezados.join(','));
+            
+            let filas = document.querySelectorAll('#tablaMovimientos tbody tr');
+            filas.forEach(fila => {
+                if (fila.cells.length > 1 && !fila.cells[0].textContent.includes('No hay')) {
+                    let filaDatos = [];
+                    for (let i = 0; i < fila.cells.length; i++) {
+                        let texto = fila.cells[i].textContent.trim().replace(/,/g, ';').replace(/\$/g, '');
+                        filaDatos.push(`"${texto}"`);
+                    }
+                    datos.push(filaDatos.join(','));
+                }
+            });
+            
+            let csv = datos.join('\n');
+            let blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+            let link = document.createElement('a');
+            let url = URL.createObjectURL(blob);
+            link.href = url;
+            link.download = 'movimientos_{{ tarjeta.banco|slugify }}.csv';
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        // EXPORTAR A PDF
+        function exportarPDF() {
+            let originalTitle = document.title;
+            document.title = 'Movimientos - {{ tarjeta.banco }}';
+            setTimeout(() => window.print(), 100);
+            setTimeout(() => document.title = originalTitle, 500);
+            return false;
+        }
+        
+        window.onload = calcularTotales;
+    </script>
+</body>
+</html>
