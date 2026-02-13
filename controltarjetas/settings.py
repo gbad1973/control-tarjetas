@@ -41,18 +41,9 @@ ROOT_URLCONF = 'controltarjetas.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
-        'APP_DIRS': False,
+        'DIRS': [],   # 👈 Vacío
+        'APP_DIRS': True,   # 👈 Esto buscará dentro de cada app
         'OPTIONS': {
-            'loaders': [
-                (
-                    'django.template.loaders.cached.Loader',
-                    [
-                        'django.template.loaders.filesystem.Loader',
-                        'django.template.loaders.app_directories.Loader',
-                    ],
-                ),
-            ],
             'context_processors': [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
