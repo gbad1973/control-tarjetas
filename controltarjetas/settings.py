@@ -41,7 +41,7 @@ ROOT_URLCONF = 'controltarjetas.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],  # 👈 ESTA ES LA CLAVE
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
