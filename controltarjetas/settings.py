@@ -1,16 +1,17 @@
 import os
 from pathlib import Path
 from decouple import config
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECRET KEY - Usa variable de entorno
+# SECRET KEY - desde variable de entorno
 SECRET_KEY = config('SECRET_KEY', default='clave-secreta-temporal')
 
-# DEBUG - False en producción
+# DEBUG - desde variable de entorno
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-# ALLOWED HOSTS - Tu dominio en Render
+# ALLOWED HOSTS - tu dominio en Render
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
 
 # Application definition
@@ -27,7 +28,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # Para archivos estáticos
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -38,11 +39,12 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'controltarjetas.urls'
 
+# Templates
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],   # 👈 Vacío
-        'APP_DIRS': True,   # 👈 Esto buscará dentro de cada app
+        'DIRS': [BASE_DIR / 'templates'],  # 👈 importante, para que encuentre tus templates
+        'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
@@ -56,13 +58,13 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'controltarjetas.wsgi.application'
 
-# Database - Usa PostgreSQL en Render
-import dj_database_url
+# Database - PostgreSQL en Neon
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': '/data/db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=config('DATABASE_URL'),  # Usa la variable de entorno DATABASE_URL
+        conn_max_age=600,
+        ssl_require=True
+    )
 }
 
 # Password validation
@@ -79,26 +81,24 @@ TIME_ZONE = 'America/Mexico_City'
 USE_I18N = True
 USE_TZ = True
 
-# Static files (CSS, JavaScript, Images)
+# Static files
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
-
-# WhiteNoise para archivos estáticos
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR / 'static']
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Media files
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Login URL
+# Login URLs
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
 
-# Seguridad - Solo activar en producción
+# Seguridad en producción
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
