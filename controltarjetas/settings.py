@@ -1,34 +1,43 @@
 import os
 from pathlib import Path
-from decouple import config
+from decouple import config, Csv
 import dj_database_url
+from dotenv import load_dotenv
 
+# Cargar variables de entorno desde .env (local)
+env_path = Path(__file__).resolve().parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
+
+# Base
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECRET KEY - desde variable de entorno
-SECRET_KEY = config('SECRET_KEY', default='clave-secreta-temporal')
+# SECRET_KEY
+SECRET_KEY = config('SECRET_KEY', default='reemplaza-esto-en-produccion')
 
-# DEBUG - desde variable de entorno
+# DEBUG
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-# ALLOWED HOSTS - tu dominio en Render
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+# ALLOWED_HOSTS
+ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="*", cast=Csv())
 
-# Application definition
+CSRF_TRUSTED_ORIGINS = ['https://control-tarjetas.onrender.com']
+
+
+# Aplicaciones
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'whitenoise.runserver_nostatic',  # Para archivos estáticos
     'django.contrib.staticfiles',
     'tarjetas_app',
 ]
 
+# Middleware
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # WhiteNoise para producción
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -37,13 +46,15 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# URLs y WSGI
 ROOT_URLCONF = 'controltarjetas.urls'
+WSGI_APPLICATION = 'controltarjetas.wsgi.application'
 
 # Templates
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],  # 👈 importante, para que encuentre tus templates
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -56,14 +67,12 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'controltarjetas.wsgi.application'
-
-# Database - PostgreSQL en Neon
+# Base de datos - PostgreSQL Neon
 DATABASES = {
-    'default': dj_database_url.config(
-        default=config('DATABASE_URL'),  # Usa la variable de entorno DATABASE_URL
+    'default': dj_database_url.parse(
+        config('DATABASE_URL'),  # tu variable de entorno en Render
         conn_max_age=600,
-        ssl_require=True
+        ssl_require=True  # importante para Neon
     )
 }
 
@@ -75,23 +84,23 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# Internationalization
+# Internacionalización
 LANGUAGE_CODE = 'es-mx'
 TIME_ZONE = 'America/Mexico_City'
 USE_I18N = True
 USE_TZ = True
 
-# Static files
+# Archivos estáticos
 STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Media files
+# Archivos de medios
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Default primary key field type
+# Primary key
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Login URLs
