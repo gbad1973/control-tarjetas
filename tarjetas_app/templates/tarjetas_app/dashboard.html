@@ -783,10 +783,12 @@
                 
                 <!-- Footer -->
                 <div class="dashboard-footer">
-                    <a href="{% url 'movimientos_tarjeta' tarjeta_seleccionada.id %}" class="ver-movimientos" id="btnMovimientosTarjeta">
-                        📈 Ver Movimientos de esta Tarjeta
-                    </a>
-                </div>
+    {% if tarjeta_seleccionada %}
+        <a href="{% url 'movimientos_tarjeta' tarjeta_seleccionada.id %}" class="ver-movimientos" id="btnMovimientosTarjeta">
+            📈 Ver Movimientos de esta Tarjeta
+        </a>
+    {% endif %}
+</div>
             </div>
         </div>
     </div>
