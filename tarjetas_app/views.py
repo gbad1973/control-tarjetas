@@ -533,7 +533,8 @@ def detalle_persona(request, persona_id):
         movimientos = movimientos.filter(fecha__lte=fecha_hasta)
     
     # Ordenar
-    movimientos = movimientos.order_by('-fecha', '-fecha_registro')
+    #movimientos = movimientos.order_by('-fecha', '-fecha_registro')
+    movimientos = movimientos.order_by('fecha')
     
     # Calcular saldo corriente
     saldo = 0
@@ -568,7 +569,8 @@ def detalle_persona(request, persona_id):
 def movimientos_tarjeta(request, tarjeta_id):
     """Vista para ver TODOS los movimientos de una tarjeta específica"""
     tarjeta = get_object_or_404(Tarjeta, id=tarjeta_id, activa=True)
-    movimientos = Movimiento.objects.filter(tarjeta=tarjeta).order_by('-fecha', '-fecha_registro')
+    movimientos = Movimiento.objects.filter(tarjeta=tarjeta).order_by('fecha')
+    #movimientos = Movimiento.objects.filter(tarjeta=tarjeta).order_by('-fecha', '-fecha_registro')
     
     # Filtrar por fecha
     fecha_desde = request.GET.get('fecha_desde')
