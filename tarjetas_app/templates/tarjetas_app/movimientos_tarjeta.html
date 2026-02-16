@@ -57,13 +57,69 @@
         
         .acciones { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap; }
         
+        /* ===== ESTILOS DE IMPRESIÓN MEJORADOS ===== */
         @media print {
-            body { background: white; padding: 0.5in; }
-            .container { box-shadow: none; padding: 0; }
-            .btn, .acciones, .filtros, .resumen, .header a, [class*="btn"] { display: none !important; }
-            .header h1 { display: block !important; font-size: 16pt; color: black; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
-            .tabla-container { border: none; }
-            th { background: #f0f0f0 !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            @page {
+                size: landscape;  /* Orientación horizontal */
+                margin: 1cm;
+            }
+            
+            body { background: white; padding: 0; }
+            .container { box-shadow: none; padding: 10px; max-width: 100%; }
+            
+            /* Ocultar elementos no deseados */
+            .btn, .acciones, .filtros, .resumen, .header a, [class*="btn"] {
+                display: none !important;
+            }
+            
+            .header h1 { 
+                display: block !important; 
+                font-size: 14pt; 
+                color: black; 
+                margin-bottom: 15px; 
+                border-bottom: 1px solid #ccc; 
+                padding-bottom: 5px; 
+            }
+            
+            .tabla-container { 
+                display: block !important; 
+                border: none; 
+                overflow: visible;
+            }
+            
+            table { 
+                font-size: 9pt; 
+                width: 100%; 
+                border-collapse: collapse; 
+                page-break-inside: auto;
+            }
+            
+            th { 
+                background: #f0f0f0 !important; 
+                color: black !important; 
+                -webkit-print-color-adjust: exact; 
+                print-color-adjust: exact; 
+                padding: 6px; 
+            }
+            
+            td { 
+                padding: 4px 6px; 
+                border-bottom: 1px solid #ddd; 
+            }
+            
+            thead { display: table-header-group; }
+            tfoot { display: table-footer-group; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+            
+            .badge-cargo, .badge-abono { 
+                background: #f0f0f0 !important; 
+                color: black !important; 
+                border: 1px solid #aaa;
+            }
+            
+            .monto-cargo, .monto-abono { 
+                color: black !important; 
+            }
         }
         
         @media (max-width: 768px) {
@@ -74,6 +130,8 @@
             .saldo-item { align-items: flex-start; }
         }
     </style>
+    {# Cargar humanize para el filtro intcomma #}
+    {% load humanize %}
 </head>
 <body>
     <div class="container">
@@ -95,15 +153,15 @@
             <div class="tarjeta-saldo">
                 <div class="saldo-item">
                     <span class="saldo-label">Límite</span>
-                    <span class="saldo-value">${{ tarjeta.limite_credito|floatformat:0 }}</span>
+                    <span class="saldo-value">${{ tarjeta.limite_credito|floatformat:0|intcomma }}</span>
                 </div>
                 <div class="saldo-item">
                     <span class="saldo-label">Saldo</span>
-                    <span class="saldo-value">${{ tarjeta.saldo_actual|floatformat:0 }}</span>
+                    <span class="saldo-value">${{ tarjeta.saldo_actual|floatformat:0|intcomma }}</span>
                 </div>
                 <div class="saldo-item">
                     <span class="saldo-label">Disponible</span>
-                    <span class="saldo-value">${{ tarjeta.saldo_disponible|floatformat:0 }}</span>
+                    <span class="saldo-value">${{ tarjeta.saldo_disponible|floatformat:0|intcomma }}</span>
                 </div>
             </div>
         </div>
@@ -195,9 +253,9 @@
                         </td>
                         <td>{{ movimiento.establecimiento.nombre|default:"-"|truncatechars:15 }}</td>
                         <td>{{ movimiento.descripcion|truncatechars:25 }}</td>
-                        <td class="text-right monto-cargo">{% if movimiento.es_cargo %}${{ movimiento.monto|floatformat:2 }}{% endif %}</td>
-                        <td class="text-right monto-abono">{% if movimiento.es_abono %}${{ movimiento.monto|floatformat:2 }}{% endif %}</td>
-                        <td class="text-right {% if movimiento.saldo_corriente > 0 %}monto-cargo{% else %}monto-abono{% endif %}">${{ movimiento.saldo_corriente|floatformat:2 }}</td>
+                        <td class="text-right monto-cargo">{% if movimiento.es_cargo %}${{ movimiento.monto|floatformat:2|intcomma }}{% endif %}</td>
+                        <td class="text-right monto-abono">{% if movimiento.es_abono %}${{ movimiento.monto|floatformat:2|intcomma }}{% endif %}</td>
+                        <td class="text-right {% if movimiento.saldo_corriente > 0 %}monto-cargo{% else %}monto-abono{% endif %}">${{ movimiento.saldo_corriente|floatformat:2|intcomma }}</td>
                     </tr>
                     {% empty %}
                     <tr>
@@ -227,6 +285,9 @@
     </div>
     
     <script>
+        // Función global de formato de moneda (DEFINIDA PRIMERO)
+        const formatearMoneda = (n) => '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
         // Calcular totales
         function calcularTotales() {
             let totalCargos = 0, totalAbonos = 0, saldo = 0;
@@ -240,7 +301,6 @@
                 {% endif %}
             {% endfor %}
             
-            const formatearMoneda = (n) => '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
             document.getElementById('totalCargos').textContent = formatearMoneda(totalCargos);
             document.getElementById('totalAbonos').textContent = formatearMoneda(totalAbonos);
             document.getElementById('totalSaldo').textContent = formatearMoneda(saldo);
@@ -249,31 +309,46 @@
             document.getElementById('totalSaldoColumna').textContent = formatearMoneda(saldo);
         }
         
-        // EXPORTAR A EXCEL
+        // EXPORTAR A EXCEL (CON FORMATO DE MONEDA Y CEROS)
         function exportarExcel() {
             let datos = [];
             let encabezados = ['Fecha', 'Persona', 'Tarjeta', 'Tipo', 'Establecimiento', 'Descripción', 'Cargo', 'Abono', 'Saldo'];
             datos.push(encabezados.join(','));
-            
+
             let filas = document.querySelectorAll('#tablaMovimientos tbody tr');
             filas.forEach(fila => {
                 if (fila.cells.length > 1 && !fila.cells[0].textContent.includes('No hay')) {
                     let filaDatos = [];
-                    for (let i = 0; i < fila.cells.length; i++) {
-                        let texto = fila.cells[i].textContent.trim().replace(/,/g, ';').replace(/\$/g, '');
-                        filaDatos.push(`"${texto}"`);
+                    // Columnas de texto: índices 0 a 5
+                    for (let i = 0; i <= 5; i++) {
+                        filaDatos.push(`"${fila.cells[i].textContent.trim()}"`);
                     }
+                    // Cargo (columna 6)
+                    let cargoTexto = fila.cells[6].textContent.trim().replace('$', '').replace(/,/g, '');
+                    let cargoNum = cargoTexto ? parseFloat(cargoTexto) : 0;
+                    filaDatos.push(`"${formatearMoneda(cargoNum)}"`);
+                    // Abono (columna 7)
+                    let abonoTexto = fila.cells[7].textContent.trim().replace('$', '').replace(/,/g, '');
+                    let abonoNum = abonoTexto ? parseFloat(abonoTexto) : 0;
+                    filaDatos.push(`"${formatearMoneda(abonoNum)}"`);
+                    // Saldo (columna 8)
+                    let saldoTexto = fila.cells[8].textContent.trim().replace('$', '').replace(/,/g, '');
+                    let saldoNum = parseFloat(saldoTexto) || 0;
+                    filaDatos.push(`"${formatearMoneda(saldoNum)}"`);
+
                     datos.push(filaDatos.join(','));
                 }
             });
-            
+
             let csv = datos.join('\n');
             let blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
             let link = document.createElement('a');
             let url = URL.createObjectURL(blob);
             link.href = url;
             link.download = 'movimientos_{{ tarjeta.banco|slugify }}.csv';
+            document.body.appendChild(link);
             link.click();
+            document.body.removeChild(link);
             URL.revokeObjectURL(url);
         }
         

@@ -71,7 +71,7 @@
             .header a, .dashboard-footer, .sidebar, [class*="btn"] {
                 display: none !important;
             }
-            
+
             /* Solo mostrar el nombre de la persona y la tabla */
             .header h1 { 
                 display: block !important; 
@@ -131,6 +131,14 @@
                 -webkit-print-color-adjust: exact; 
                 print-color-adjust: exact; 
             }
+
+            /* Mejoras para impresión profesional */
+            thead { display: table-header-group; }
+            tfoot { display: table-footer-group; }
+            body { font-size: 10pt; }
+            .container { max-width: 100%; padding: 0; }
+            table { page-break-inside: auto; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
         }
         
         @media (max-width: 768px) {
@@ -142,6 +150,8 @@
             .header h1 { font-size: 1.2rem; }
         }
     </style>
+    <!-- NUEVA LÍNEA: Cargar humanize para usar filtro intcomma -->
+    {% load humanize %}
 </head>
 <body>
     <div class="container">
@@ -180,15 +190,18 @@
             <div class="tarjeta-saldo">
                 <div class="saldo-item">
                     <span class="saldo-label">Límite</span>
-                    <span class="saldo-value">${{ tarjeta_seleccionada.limite_credito|floatformat:0 }}</span>
+                    <!-- MODIFICADO: Añadido filtro intcomma -->
+                    <span class="saldo-value">${{ tarjeta_seleccionada.limite_credito|floatformat:0|intcomma }}</span>
                 </div>
                 <div class="saldo-item">
                     <span class="saldo-label">Saldo</span>
-                    <span class="saldo-value">${{ tarjeta_seleccionada.saldo_actual|floatformat:0 }}</span>
+                    <!-- MODIFICADO: Añadido filtro intcomma -->
+                    <span class="saldo-value">${{ tarjeta_seleccionada.saldo_actual|floatformat:0|intcomma }}</span>
                 </div>
                 <div class="saldo-item">
                     <span class="saldo-label">Disponible</span>
-                    <span class="saldo-value">${{ tarjeta_seleccionada.saldo_disponible|floatformat:0 }}</span>
+                    <!-- MODIFICADO: Añadido filtro intcomma -->
+                    <span class="saldo-value">${{ tarjeta_seleccionada.saldo_disponible|floatformat:0|intcomma }}</span>
                 </div>
             </div>
         </div>
@@ -281,9 +294,11 @@
                         </td>
                         <td>{{ movimiento.establecimiento.nombre|default:"-"|truncatechars:15 }}</td>
                         <td>{{ movimiento.descripcion|truncatechars:25 }}</td>
-                        <td class="text-right monto-cargo">{% if movimiento.es_cargo %}${{ movimiento.monto|floatformat:2 }}{% endif %}</td>
-                        <td class="text-right monto-abono">{% if movimiento.es_abono %}${{ movimiento.monto|floatformat:2 }}{% endif %}</td>
-                        <td class="text-right {% if movimiento.saldo_corriente > 0 %}monto-cargo{% else %}monto-abono{% endif %}">${{ movimiento.saldo_corriente|floatformat:2 }}</td>
+                        <!-- MODIFICADO: Añadido filtro intcomma a monto -->
+                        <td class="text-right monto-cargo">{% if movimiento.es_cargo %}${{ movimiento.monto|floatformat:2|intcomma }}{% endif %}</td>
+                        <td class="text-right monto-abono">{% if movimiento.es_abono %}${{ movimiento.monto|floatformat:2|intcomma }}{% endif %}</td>
+                        <!-- MODIFICADO: Añadido filtro intcomma a saldo_corriente -->
+                        <td class="text-right {% if movimiento.saldo_corriente > 0 %}monto-cargo{% else %}monto-abono{% endif %}">${{ movimiento.saldo_corriente|floatformat:2|intcomma }}</td>
                     </tr>
                     {% empty %}
                     <tr>
@@ -313,6 +328,9 @@
     </div>
     
     <script>
+        // Función global de formato de moneda (AHORA DEFINIDA FUERA DE CALCULAR TOTALES)
+        const formatearMoneda = (n) => '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
         // Calcular totales
         function calcularTotales() {
             let totalCargos = 0, totalAbonos = 0, saldo = 0;
@@ -326,7 +344,6 @@
                 {% endif %}
             {% endfor %}
             
-            const formatearMoneda = (n) => '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
             document.getElementById('totalCargos').textContent = formatearMoneda(totalCargos);
             document.getElementById('totalAbonos').textContent = formatearMoneda(totalAbonos);
             document.getElementById('totalSaldo').textContent = formatearMoneda(saldo);
@@ -340,19 +357,32 @@
             let datos = [];
             let encabezados = ['Fecha', 'Tarjeta', 'Tipo', 'Establecimiento', 'Descripción', 'Cargo', 'Abono', 'Saldo'];
             datos.push(encabezados.join(','));
-            
+
             let filas = document.querySelectorAll('#tablaMovimientos tbody tr');
             filas.forEach(fila => {
                 if (fila.cells.length > 1 && !fila.cells[0].textContent.includes('No hay')) {
                     let filaDatos = [];
-                    for (let i = 0; i < fila.cells.length; i++) {
-                        let texto = fila.cells[i].textContent.trim().replace(/,/g, ';').replace(/\$/g, '');
-                        filaDatos.push(`"${texto}"`);
+                    // Columnas de texto (índices 0 a 4)
+                    for (let i = 0; i <= 4; i++) {
+                        filaDatos.push(`"${fila.cells[i].textContent.trim()}"`);
                     }
+                    // Cargo (columna 5)
+                    let cargoTexto = fila.cells[5].textContent.trim().replace('$', '').replace(/,/g, '');
+                    let cargoNum = cargoTexto ? parseFloat(cargoTexto) : 0;
+                    filaDatos.push(`"${formatearMoneda(cargoNum)}"`);
+                    // Abono (columna 6)
+                    let abonoTexto = fila.cells[6].textContent.trim().replace('$', '').replace(/,/g, '');
+                    let abonoNum = abonoTexto ? parseFloat(abonoTexto) : 0;
+                    filaDatos.push(`"${formatearMoneda(abonoNum)}"`);
+                    // Saldo (columna 7)
+                    let saldoTexto = fila.cells[7].textContent.trim().replace('$', '').replace(/,/g, '');
+                    let saldoNum = parseFloat(saldoTexto) || 0;
+                    filaDatos.push(`"${formatearMoneda(saldoNum)}"`);
+
                     datos.push(filaDatos.join(','));
                 }
             });
-            
+
             let csv = datos.join('\n');
             let blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
             let link = document.createElement('a');
@@ -364,7 +394,7 @@
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
         }
-        
+
         // EXPORTAR A PDF - SOLO NOMBRE Y TABLA
         function exportarPDF() {
             let originalTitle = document.title;
