@@ -21,7 +21,8 @@ def eliminar_superusuario(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('tarjetas_app', '0003_alter_tarjeta_fecha_vencimiento_tarjeta'),  # Ajusta el número según tu última migración
+        ('tarjetas_app', '0001_initial'),
+        # Ajusta el número según tu última migración
     ]
 
     operations = [
