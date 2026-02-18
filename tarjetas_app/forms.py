@@ -1,6 +1,9 @@
 # tarjetas_app/forms.py
 from django import forms
-from .models import Persona, Tarjeta, Establecimiento, Movimiento
+from .models import Persona, Tarjeta, Establecimiento, Movimiento, PagoCompra
+from django.forms import formset_factory
+
+
 
 class PersonaForm(forms.ModelForm):
     class Meta:
@@ -152,3 +155,17 @@ class MovimientoForm(forms.ModelForm):
             'descripcion': 'Descripción',
             'fecha': 'Fecha del movimiento',
         }
+
+
+
+class PagoCompraForm(forms.ModelForm):
+    class Meta:
+        model = PagoCompra
+        fields = ['compra', 'monto_aplicado']
+        widgets = {
+            'compra': forms.Select(attrs={'class': 'form-control'}),
+            'monto_aplicado': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Monto a aplicar'}),
+        }
+
+PagoCompraFormSet = formset_factory(PagoCompraForm, extra=1, can_delete=True)
+    

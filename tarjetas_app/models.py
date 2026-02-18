@@ -115,7 +115,7 @@ class Movimiento(models.Model):
         ('INTERES', 'Interés'),
         ('CASHBACK', 'Cashback'),
     ]
-    
+       
     tarjeta = models.ForeignKey(Tarjeta, on_delete=models.CASCADE, related_name='movimientos', verbose_name="Tarjeta")
     persona = models.ForeignKey(Persona, on_delete=models.CASCADE, related_name='movimientos', verbose_name="Persona")
     establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE, verbose_name="Establecimiento",null=True,blank=True)
@@ -161,3 +161,29 @@ class Movimiento(models.Model):
     def es_abono(self):
         """Determina si es un abono (pago, cashback)"""
         return self.tipo in ['PAGO', 'CASHBACK']
+    
+    @property
+    def saldo_pendiente(self):
+        """Calcula el saldo pendiente si es una compra"""
+        if self.tipo not in ['COMPRA', 'COMISION', 'INTERES']:
+            return 0
+        total_pagado = self.pagos_recibidos.aggregate(total=models.Sum('monto_aplicado'))['total'] or 0
+        return self.monto - total_pagado
+    
+    
+    
+    
+class PagoCompra(models.Model):
+    """Relaciona un pago con una compra y guarda el monto aplicado"""
+    pago = models.ForeignKey('Movimiento', on_delete=models.CASCADE, related_name='pagos_a_compras')
+    compra = models.ForeignKey('Movimiento', on_delete=models.CASCADE, related_name='pagos_recibidos')
+    monto_aplicado = models.DecimalField(max_digits=10, decimal_places=2)
+    fecha = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('pago', 'compra')
+        verbose_name = "Pago aplicado a compra"
+        verbose_name_plural = "Pagos aplicados a compras"
+
+    def __str__(self):
+        return f"Pago {self.pago.id} → ${self.monto_aplicado} a compra {self.compra.id}"

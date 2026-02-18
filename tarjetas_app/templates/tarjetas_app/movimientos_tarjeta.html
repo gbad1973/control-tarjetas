@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Movimientos de {{ tarjeta.banco }} - Control de Tarjetas</title>
     <style>
+        /* Estilos existentes (los mismos que tenías, se mantienen) */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
         .container { max-width: 1400px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); padding: 25px; }
@@ -54,72 +55,29 @@
         .monto-cargo { color: #ef4444; font-weight: 600; }
         .monto-abono { color: #10b981; font-weight: 600; }
         .text-right { text-align: right; }
+        .compra-row { background-color: #f9fafc; font-weight: 500; border-top: 2px solid #4f46e5; }
+        .pago-row { background-color: #ffffff; }
+        .pago-row td:first-child { padding-left: 30px; } /* Sangría para pagos */
+        .pago-row td { color: #059669; }
         
         .acciones { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap; }
         
-        /* ===== ESTILOS DE IMPRESIÓN MEJORADOS ===== */
+        /* Estilos de impresión */
         @media print {
-            @page {
-                size: landscape;  /* Orientación horizontal */
-                margin: 1cm;
-            }
-            
+            @page { size: landscape; margin: 1cm; }
             body { background: white; padding: 0; }
             .container { box-shadow: none; padding: 10px; max-width: 100%; }
-            
-            /* Ocultar elementos no deseados */
-            .btn, .acciones, .filtros, .resumen, .header a, [class*="btn"] {
-                display: none !important;
-            }
-            
-            .header h1 { 
-                display: block !important; 
-                font-size: 14pt; 
-                color: black; 
-                margin-bottom: 15px; 
-                border-bottom: 1px solid #ccc; 
-                padding-bottom: 5px; 
-            }
-            
-            .tabla-container { 
-                display: block !important; 
-                border: none; 
-                overflow: visible;
-            }
-            
-            table { 
-                font-size: 9pt; 
-                width: 100%; 
-                border-collapse: collapse; 
-                page-break-inside: auto;
-            }
-            
-            th { 
-                background: #f0f0f0 !important; 
-                color: black !important; 
-                -webkit-print-color-adjust: exact; 
-                print-color-adjust: exact; 
-                padding: 6px; 
-            }
-            
-            td { 
-                padding: 4px 6px; 
-                border-bottom: 1px solid #ddd; 
-            }
-            
+            .btn, .acciones, .filtros, .resumen, .header a, [class*="btn"] { display: none !important; }
+            .header h1 { display: block !important; font-size: 14pt; color: black; margin-bottom: 15px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+            .tabla-container { display: block !important; border: none; overflow: visible; }
+            table { font-size: 9pt; width: 100%; border-collapse: collapse; page-break-inside: auto; }
+            th { background: #f0f0f0 !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 6px; }
+            td { padding: 4px 6px; border-bottom: 1px solid #ddd; }
             thead { display: table-header-group; }
             tfoot { display: table-footer-group; }
             tr { page-break-inside: avoid; page-break-after: auto; }
-            
-            .badge-cargo, .badge-abono { 
-                background: #f0f0f0 !important; 
-                color: black !important; 
-                border: 1px solid #aaa;
-            }
-            
-            .monto-cargo, .monto-abono { 
-                color: black !important; 
-            }
+            .badge-cargo, .badge-abono { background: #f0f0f0 !important; color: black !important; border: 1px solid #aaa; }
+            .monto-cargo, .monto-abono { color: black !important; }
         }
         
         @media (max-width: 768px) {
@@ -130,7 +88,6 @@
             .saldo-item { align-items: flex-start; }
         }
     </style>
-    {# Cargar humanize para el filtro intcomma #}
     {% load humanize %}
 </head>
 <body>
@@ -213,7 +170,7 @@
         
         <!-- BOTONES DE EXPORTACIÓN -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h2 style="color: #1f2937; font-size: 1rem; font-weight: 600;">📋 Todos los movimientos</h2>
+            <h2 style="color: #1f2937; font-size: 1rem; font-weight: 600;">📋 Compras y Pagos</h2>
             <div style="display: flex; gap: 8px;">
                 <button onclick="exportarExcel()" class="btn btn-success" type="button">
                     📊 Excel
@@ -224,7 +181,7 @@
             </div>
         </div>
         
-        <!-- TABLA DE MOVIMIENTOS - CON COLUMNA PERSONA -->
+        <!-- TABLA DE COMPRAS CON SUS PAGOS -->
         <div class="tabla-container">
             <table id="tablaMovimientos">
                 <thead>
@@ -241,30 +198,77 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for movimiento in movimientos %}
-                    <tr>
-                        <td>{{ movimiento.fecha|date:"d/m/Y" }}</td>
-                        <td>{{ movimiento.persona.nombre }}</td>
-                        <td>{{ movimiento.tarjeta.banco }}</td>
+                    {% for compra in compras %}
+                    <!-- Fila de la compra -->
+                    <tr class="compra-row">
+                        <td>{{ compra.fecha|date:"d/m/Y" }}</td>
+                        <td>{{ compra.persona.nombre }}</td>
+                        <td>{{ compra.tarjeta.banco }}</td>
                         <td>
-                            <span class="badge {% if movimiento.es_cargo %}badge-cargo{% else %}badge-abono{% endif %}">
-                                {{ movimiento.get_tipo_display|slice:":4" }}
+                            <span class="badge badge-cargo">
+                                {{ compra.get_tipo_display|slice:":4" }}
                             </span>
                         </td>
-                        <td>{{ movimiento.establecimiento.nombre|default:"-"|truncatechars:15 }}</td>
-                        <td>{{ movimiento.descripcion|truncatechars:25 }}</td>
-                        <td class="text-right monto-cargo">{% if movimiento.es_cargo %}${{ movimiento.monto|floatformat:2|intcomma }}{% endif %}</td>
-                        <td class="text-right monto-abono">{% if movimiento.es_abono %}${{ movimiento.monto|floatformat:2|intcomma }}{% endif %}</td>
-                        <td class="text-right {% if movimiento.saldo_corriente > 0 %}monto-cargo{% else %}monto-abono{% endif %}">${{ movimiento.saldo_corriente|floatformat:2|intcomma }}</td>
+                        <td>{{ compra.establecimiento.nombre|default:"-" }}</td>
+                        <td>{{ compra.descripcion|truncatechars:25 }}</td>
+                        <td class="text-right monto-cargo">${{ compra.monto|floatformat:2|intcomma }}</td>
+                        <td class="text-right">-</td>
+                        <td class="text-right {% if compra.saldo_pendiente > 0 %}monto-cargo{% else %}monto-abono{% endif %}">
+                            ${{ compra.saldo_pendiente|floatformat:2|intcomma }}
+                        </td>
                     </tr>
+                    <!-- Pagos asociados a esta compra -->
+                    {% for pago_compra in compra.pagos_ordenados %}
+                    <tr class="pago-row">
+                        <td>{{ pago_compra.pago.fecha|date:"d/m/Y" }}</td>
+                        <td>{{ pago_compra.pago.persona.nombre }}</td>
+                        <td>{{ pago_compra.pago.tarjeta.banco }}</td>
+                        <td>
+                            <span class="badge badge-abono">
+                                {{ pago_compra.pago.get_tipo_display|slice:":4" }}
+                            </span>
+                        </td>
+                        <td>-</td>
+                        <td>{{ pago_compra.pago.descripcion|truncatechars:25 }}</td>
+                        <td class="text-right">-</td>
+                        <td class="text-right monto-abono">${{ pago_compra.monto_aplicado|floatformat:2|intcomma }}</td>
+                        <td class="text-right">-</td>
+                    </tr>
+                    {% endfor %}
                     {% empty %}
                     <tr>
                         <td colspan="9" style="text-align: center; padding: 30px; color: #6b7280;">
                             <span style="font-size: 2rem; display: block; margin-bottom: 10px;">📭</span>
-                            <p>No hay movimientos en esta tarjeta</p>
+                            <p>No hay compras registradas en esta tarjeta</p>
                         </td>
                     </tr>
                     {% endfor %}
+
+                    <!-- Pagos no asignados -->
+                    {% if pagos_sin_asignar %}
+                    <tr class="compra-row">
+                        <td colspan="9" style="background: #f0f0f0; font-weight: bold; text-align: center;">
+                            ⚠️ Pagos sin compra asociada
+                        </td>
+                    </tr>
+                    {% for pago in pagos_sin_asignar %}
+                    <tr class="pago-row">
+                        <td>{{ pago.fecha|date:"d/m/Y" }}</td>
+                        <td>{{ pago.persona.nombre }}</td>
+                        <td>{{ pago.tarjeta.banco }}</td>
+                        <td>
+                            <span class="badge badge-abono">
+                                {{ pago.get_tipo_display|slice:":4" }}
+                            </span>
+                        </td>
+                        <td>-</td>
+                        <td>{{ pago.descripcion|truncatechars:25 }}</td>
+                        <td class="text-right">-</td>
+                        <td class="text-right monto-abono">${{ pago.monto|floatformat:2|intcomma }}</td>
+                        <td class="text-right">-</td>
+                    </tr>
+                    {% endfor %}
+                    {% endif %}
                 </tbody>
                 <tfoot style="background: #f8fafc; font-weight: 600; font-size: 0.8rem;">
                     <tr>
@@ -285,21 +289,32 @@
     </div>
     
     <script>
-        // Función global de formato de moneda (DEFINIDA PRIMERO)
+        // Función global de formato de moneda
         const formatearMoneda = (n) => '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
         // Calcular totales
         function calcularTotales() {
             let totalCargos = 0, totalAbonos = 0, saldo = 0;
-            {% for movimiento in movimientos %}
-                {% if movimiento.es_cargo %}
-                    totalCargos += {{ movimiento.monto|floatformat:2 }};
-                    saldo += {{ movimiento.monto|floatformat:2 }};
-                {% elif movimiento.es_abono %}
-                    totalAbonos += {{ movimiento.monto|floatformat:2 }};
-                    saldo -= {{ movimiento.monto|floatformat:2 }};
-                {% endif %}
-            {% endfor %}
+            const filas = document.querySelectorAll('#tablaMovimientos tbody tr');
+            filas.forEach(fila => {
+                if (fila.cells.length === 1) return; // saltar filas de separación
+                const cargoCelda = fila.cells[6];
+                const abonoCelda = fila.cells[7];
+                const saldoCelda = fila.cells[8];
+                
+                if (cargoCelda && cargoCelda.textContent.trim() !== '-') {
+                    let valor = parseFloat(cargoCelda.textContent.replace('$', '').replace(/,/g, '')) || 0;
+                    totalCargos += valor;
+                }
+                if (abonoCelda && abonoCelda.textContent.trim() !== '-') {
+                    let valor = parseFloat(abonoCelda.textContent.replace('$', '').replace(/,/g, '')) || 0;
+                    totalAbonos += valor;
+                }
+                if (saldoCelda && saldoCelda.textContent.trim() !== '-') {
+                    let valor = parseFloat(saldoCelda.textContent.replace('$', '').replace(/,/g, '')) || 0;
+                    saldo += valor;
+                }
+            });
             
             document.getElementById('totalCargos').textContent = formatearMoneda(totalCargos);
             document.getElementById('totalAbonos').textContent = formatearMoneda(totalAbonos);
@@ -309,7 +324,7 @@
             document.getElementById('totalSaldoColumna').textContent = formatearMoneda(saldo);
         }
         
-        // EXPORTAR A EXCEL (CON FORMATO DE MONEDA Y CEROS)
+        // EXPORTAR A EXCEL
         function exportarExcel() {
             let datos = [];
             let encabezados = ['Fecha', 'Persona', 'Tarjeta', 'Tipo', 'Establecimiento', 'Descripción', 'Cargo', 'Abono', 'Saldo'];
@@ -317,27 +332,25 @@
 
             let filas = document.querySelectorAll('#tablaMovimientos tbody tr');
             filas.forEach(fila => {
-                if (fila.cells.length > 1 && !fila.cells[0].textContent.includes('No hay')) {
-                    let filaDatos = [];
-                    // Columnas de texto: índices 0 a 5
-                    for (let i = 0; i <= 5; i++) {
-                        filaDatos.push(`"${fila.cells[i].textContent.trim()}"`);
-                    }
-                    // Cargo (columna 6)
-                    let cargoTexto = fila.cells[6].textContent.trim().replace('$', '').replace(/,/g, '');
-                    let cargoNum = cargoTexto ? parseFloat(cargoTexto) : 0;
-                    filaDatos.push(`"${formatearMoneda(cargoNum)}"`);
-                    // Abono (columna 7)
-                    let abonoTexto = fila.cells[7].textContent.trim().replace('$', '').replace(/,/g, '');
-                    let abonoNum = abonoTexto ? parseFloat(abonoTexto) : 0;
-                    filaDatos.push(`"${formatearMoneda(abonoNum)}"`);
-                    // Saldo (columna 8)
-                    let saldoTexto = fila.cells[8].textContent.trim().replace('$', '').replace(/,/g, '');
-                    let saldoNum = parseFloat(saldoTexto) || 0;
-                    filaDatos.push(`"${formatearMoneda(saldoNum)}"`);
-
-                    datos.push(filaDatos.join(','));
+                if (fila.cells.length === 1) return;
+                let filaDatos = [];
+                for (let i = 0; i <= 5; i++) {
+                    filaDatos.push(`"${fila.cells[i].textContent.trim()}"`);
                 }
+                // Cargo (columna 6)
+                let cargoTexto = fila.cells[6].textContent.trim().replace('$', '').replace(/,/g, '');
+                let cargoNum = cargoTexto && cargoTexto !== '-' ? parseFloat(cargoTexto) : 0;
+                filaDatos.push(`"${formatearMoneda(cargoNum)}"`);
+                // Abono (columna 7)
+                let abonoTexto = fila.cells[7].textContent.trim().replace('$', '').replace(/,/g, '');
+                let abonoNum = abonoTexto && abonoTexto !== '-' ? parseFloat(abonoTexto) : 0;
+                filaDatos.push(`"${formatearMoneda(abonoNum)}"`);
+                // Saldo (columna 8)
+                let saldoTexto = fila.cells[8].textContent.trim().replace('$', '').replace(/,/g, '');
+                let saldoNum = saldoTexto && saldoTexto !== '-' ? parseFloat(saldoTexto) : 0;
+                filaDatos.push(`"${formatearMoneda(saldoNum)}"`);
+
+                datos.push(filaDatos.join(','));
             });
 
             let csv = datos.join('\n');
@@ -351,7 +364,7 @@
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
         }
-        
+
         // EXPORTAR A PDF
         function exportarPDF() {
             let originalTitle = document.title;

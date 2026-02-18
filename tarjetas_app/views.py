@@ -5,11 +5,13 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.db.models import Sum
 from datetime import date, datetime, timedelta
-from .models import Persona, Tarjeta, Establecimiento, Movimiento
-from .forms import PersonaForm, TarjetaForm, EstablecimientoForm, MovimientoForm
+from .models import Persona, Tarjeta, Establecimiento, Movimiento, PagoCompra
+from .forms import PersonaForm, TarjetaForm, EstablecimientoForm, MovimientoForm, PagoCompraFormSet
 from django.contrib import messages
 from django.http import JsonResponse
 from django.db import models
+
+
 
 # ========== AUTENTICACIÓN ==========
 def login_view(request):
@@ -175,20 +177,68 @@ def nuevo_movimiento(request):
         form = MovimientoForm(request.POST)
         if form.is_valid():
             movimiento = form.save(commit=False)
-            
-            # Si NO es COMPRA, asegurar que establecimiento sea NULL
             if movimiento.tipo != 'COMPRA':
                 movimiento.establecimiento = None
-            
             movimiento.save()
+
+            # Si es un pago, procesamos el formset
+            if movimiento.tipo == 'PAGO':
+                formset = PagoCompraFormSet(request.POST, prefix='pagos')
+                if formset.is_valid():
+                    # Validar que no se exceda el saldo pendiente de cada compra
+                    errores_saldo = False
+                    montos_por_compra = {}
+                    for pago_form in formset:
+                        if pago_form.cleaned_data and not pago_form.cleaned_data.get('DELETE', False):
+                            compra = pago_form.cleaned_data['compra']
+                            monto = pago_form.cleaned_data['monto_aplicado']
+                            if compra.id in montos_por_compra:
+                                montos_por_compra[compra.id] += monto
+                            else:
+                                montos_por_compra[compra.id] = monto
+
+                    for compra_id, monto_total in montos_por_compra.items():
+                        try:
+                            compra = Movimiento.objects.get(id=compra_id)
+                            saldo_actual = compra.saldo_pendiente
+                            if monto_total > saldo_actual:
+                                errores_saldo = True
+                                messages.error(
+                                    request,
+                                    f'La compra "{compra}" tiene saldo pendiente de ${saldo_actual:.2f}. '
+                                    f'No puedes aplicar ${monto_total:.2f}.'
+                                )
+                        except Movimiento.DoesNotExist:
+                            errores_saldo = True
+                            messages.error(request, f'Compra con ID {compra_id} no existe.')
+
+                    if errores_saldo:
+                        movimiento.delete()
+                        return render(request, 'tarjetas_app/nuevo_movimiento.html', {
+                            'form': form,
+                            'formset': formset
+                        })
+
+                    # Si todo está bien, guardamos los PagoCompra
+                    for pago_form in formset:
+                        if pago_form.cleaned_data and not pago_form.cleaned_data.get('DELETE', False):
+                            pago_compra = pago_form.save(commit=False)
+                            pago_compra.pago = movimiento
+                            pago_compra.save()
+                else:
+                    # Si el formset no es válido, eliminamos el movimiento y mostramos error
+                    movimiento.delete()
+                    messages.error(request, 'Error en la distribución del pago. Revisa los montos.')
+                    return render(request, 'tarjetas_app/nuevo_movimiento.html', {'form': form, 'formset': formset})
             messages.success(request, '✅ ¡Movimiento registrado exitosamente!')
             return redirect('lista_movimientos')
         else:
             messages.error(request, '❌ Error en el formulario')
     else:
         form = MovimientoForm()
-    
-    return render(request, 'tarjetas_app/nuevo_movimiento.html', {'form': form})
+        formset = PagoCompraFormSet(prefix='pagos')
+
+    return render(request, 'tarjetas_app/nuevo_movimiento.html', {'form': form, 'formset': formset})
 # *************************************************************
 @login_required
 def nuevo_establecimiento(request):
@@ -468,137 +518,113 @@ def api_personas_tarjeta(request, tarjeta_id):
     
     return JsonResponse(response_data)
 
-# ========== DETALLE PERSONA ==========
-@login_required
-def _persodetallena(request, persona_id):
-    persona = get_object_or_404(Persona, id=persona_id)
-    tarjetas = Tarjeta.objects.filter(usuarios=persona)
-    
-    # Filtrar por tarjeta si viene el parámetro
-    tarjeta_id = request.GET.get('tarjeta')
-    if tarjeta_id:
-        movimientos = Movimiento.objects.filter(
-            persona=persona,
-            tarjeta_id=tarjeta_id
-        ).order_by('-fecha', '-fecha_registro')
-        tarjeta_seleccionada = get_object_or_404(Tarjeta, id=tarjeta_id)
-    else:
-        movimientos = Movimiento.objects.filter(persona=persona).order_by('-fecha', '-fecha_registro')
-        tarjeta_seleccionada = None
-    
-    # Calcular deuda total
-    deuda_total = 0
-    for movimiento in movimientos:
-        if movimiento.tipo in ['COMPRA', 'COMISION', 'INTERES']:
-            deuda_total += movimiento.monto
-        elif movimiento.tipo in ['PAGO', 'CASHBACK']:
-            deuda_total -= movimiento.monto
-    
-    context = {
-        'persona': persona,
-        'tarjetas': tarjetas,
-        'tarjeta_seleccionada': tarjeta_seleccionada,
-        'movimientos': movimientos,
-        'deuda_total': deuda_total,
-    }
-    
-    return render(request, 'tarjetas_app/detalle_persona.html', context)
-
-
-#####******************** DETALLE PERSONA.  **********************************
-
+# ========== DETALLE PERSONA (MODIFICADA) ==========
 @login_required
 def detalle_persona(request, persona_id):
-    """Vista para ver el detalle de una persona y sus movimientos"""
     persona = get_object_or_404(Persona, id=persona_id)
     tarjetas = Tarjeta.objects.filter(usuarios=persona)
-    
-    # Filtrar por tarjeta si viene el parámetro
+
     tarjeta_id = request.GET.get('tarjeta')
-    movimientos = Movimiento.objects.filter(persona=persona)
-    
+    # Obtener todas las compras (incluyendo comisiones e intereses) ordenadas por fecha ascendente
+    compras = Movimiento.objects.filter(
+        persona=persona,
+        tipo__in=['COMPRA', 'COMISION', 'INTERES']
+    ).order_by('fecha')
+
     if tarjeta_id:
-        movimientos = movimientos.filter(tarjeta_id=tarjeta_id)
+        compras = compras.filter(tarjeta_id=tarjeta_id)
         tarjeta_seleccionada = get_object_or_404(Tarjeta, id=tarjeta_id)
     else:
         tarjeta_seleccionada = None
-    
-    # 🔴 NUEVO: FILTRO POR FECHA
-    fecha_desde = request.GET.get('fecha_desde')
-    fecha_hasta = request.GET.get('fecha_hasta')
-    
-    if fecha_desde:
-        movimientos = movimientos.filter(fecha__gte=fecha_desde)
-    if fecha_hasta:
-        movimientos = movimientos.filter(fecha__lte=fecha_hasta)
-    
-    # Ordenar
-    #movimientos = movimientos.order_by('-fecha', '-fecha_registro')
-    movimientos = movimientos.order_by('fecha')
-    
-    # Calcular saldo corriente
-    saldo = 0
-    for movimiento in movimientos:
-        if movimiento.es_cargo():
-            saldo += movimiento.monto
-        elif movimiento.es_abono():
-            saldo -= movimiento.monto
-        movimiento.saldo_corriente = saldo
-    
-    # Calcular deuda total
-    deuda_total = 0
-    for movimiento in movimientos:
-        if movimiento.es_cargo():
-            deuda_total += movimiento.monto
-        elif movimiento.es_abono():
-            deuda_total -= movimiento.monto
-    
+
+    # Pagos sin asignar (sin ningún PagoCompra)
+    pagos_sin_asignar = Movimiento.objects.filter(
+        persona=persona,
+        tipo='PAGO'
+    ).exclude(
+        id__in=PagoCompra.objects.values('pago_id')
+    ).order_by('fecha')
+
+    if tarjeta_id:
+        pagos_sin_asignar = pagos_sin_asignar.filter(tarjeta_id=tarjeta_id)
+
     context = {
         'persona': persona,
         'tarjetas': tarjetas,
         'tarjeta_seleccionada': tarjeta_seleccionada,
-        'movimientos': movimientos,
-        'deuda_total': deuda_total,
+        'compras': compras,
+        'pagos_sin_asignar': pagos_sin_asignar,
     }
-    
     return render(request, 'tarjetas_app/detalle_persona.html', context)
 
-# **********. MOVIMIENTOS TARJETAS. ************************************
-
+# ********** MOVIMIENTOS TARJETAS ************************************
 @login_required
 def movimientos_tarjeta(request, tarjeta_id):
-    """Vista para ver TODOS los movimientos de una tarjeta específica"""
+    """Vista para ver TODOS los movimientos de una tarjeta específica, agrupados por compra"""
     tarjeta = get_object_or_404(Tarjeta, id=tarjeta_id, activa=True)
-    movimientos = Movimiento.objects.filter(tarjeta=tarjeta).order_by('fecha')
-    #movimientos = Movimiento.objects.filter(tarjeta=tarjeta).order_by('-fecha', '-fecha_registro')
-    
-    # Filtrar por fecha
+
+    # Filtrar por fecha (opcional)
     fecha_desde = request.GET.get('fecha_desde')
     fecha_hasta = request.GET.get('fecha_hasta')
-    
+
+    # Obtener todas las compras (cargos) de la tarjeta, ordenadas por fecha ascendente
+    compras = Movimiento.objects.filter(
+        tarjeta=tarjeta,
+        tipo__in=['COMPRA', 'COMISION', 'INTERES']
+    ).order_by('fecha')
+
     if fecha_desde:
-        movimientos = movimientos.filter(fecha__gte=fecha_desde)
+        compras = compras.filter(fecha__gte=fecha_desde)
     if fecha_hasta:
-        movimientos = movimientos.filter(fecha__lte=fecha_hasta)
-    
-    # Calcular saldo corriente
-    saldo = 0
-    for movimiento in movimientos:
-        if movimiento.es_cargo():
-            saldo += movimiento.monto
-        elif movimiento.es_abono():
-            saldo -= movimiento.monto
-        movimiento.saldo_corriente = saldo
-    
+        compras = compras.filter(fecha__lte=fecha_hasta)
+
+    # Para cada compra, obtener sus pagos (no hace falta recalcular saldo, la propiedad ya lo hace)
+    for compra in compras:
+        compra.pagos_ordenados = compra.pagos_recibidos.all().order_by('fecha')
+
+    # Pagos que no están asociados a ninguna compra (pagos sin asignar)
+    pagos_sin_asignar = Movimiento.objects.filter(
+        tarjeta=tarjeta,
+        tipo='PAGO'
+    ).exclude(
+        id__in=PagoCompra.objects.values('pago_id')
+    ).order_by('fecha')
+
+    if fecha_desde:
+        pagos_sin_asignar = pagos_sin_asignar.filter(fecha__gte=fecha_desde)
+    if fecha_hasta:
+        pagos_sin_asignar = pagos_sin_asignar.filter(fecha__lte=fecha_hasta)
+
     context = {
         'tarjeta': tarjeta,
-        'movimientos': movimientos,
+        'compras': compras,
+        'pagos_sin_asignar': pagos_sin_asignar,
     }
     return render(request, 'tarjetas_app/movimientos_tarjeta.html', context)
 
-
-
-
+#  ===================== compras por persona.  ==================================
+def compras_por_persona(request, persona_id):
+    """Devuelve las compras de una persona que tienen saldo pendiente"""
+    compras = Movimiento.objects.filter(
+        persona_id=persona_id,
+        tipo__in=['COMPRA', 'COMISION', 'INTERES']
+    ).order_by('-fecha')
+    
+    data = []
+    for compra in compras:
+        total_pagado = compra.pagos_recibidos.aggregate(total=Sum('monto_aplicado'))['total'] or 0
+        saldo = compra.monto - total_pagado
+        if saldo > 0:  # Solo si aún debe algo
+            establecimiento = compra.establecimiento.nombre if compra.establecimiento else "Sin establecimiento"
+            descripcion = compra.descripcion[:30] + "..." if len(compra.descripcion) > 30 else compra.descripcion
+            texto = f"Compra {compra.fecha.strftime('%d/%m/%Y')} - ${compra.monto} - {establecimiento} - {descripcion}"
+            data.append({
+                'id': compra.id,
+                'texto': texto,
+                'saldo': float(saldo)  # ← NUEVO: enviamos el saldo
+            })
+    
+    return JsonResponse(data, safe=False)
 
 # ========== REPORTES (PENDIENTES) ==========
 @login_required 

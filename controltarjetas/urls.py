@@ -19,6 +19,9 @@ urlpatterns = [
     # Detalle de persona (agregar esta función)
     path('persona/<int:persona_id>/', views.detalle_persona, name='detalle_persona'),
     path('persona/<int:persona_id>/tarjeta/<int:tarjeta_id>/', views.detalle_persona, name='detalle_persona_tarjeta'),
+    path('api/compras/<int:persona_id>/', views.compras_por_persona, name='compras_por_persona'),
+    
+
 
     # Listas
     path('personas/', views.lista_personas, name='lista_personas'),

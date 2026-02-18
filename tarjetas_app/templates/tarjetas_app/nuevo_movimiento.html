@@ -29,6 +29,30 @@
         .required-field::after { content: " *"; color: #ef4444; font-weight: bold; }
         .opcional-field::after { content: " (opcional)"; color: #6b7280; font-size: 0.8rem; font-weight: normal; }
         .estado-info { font-size: 0.8rem; margin-top: 4px; color: #6b7280; }
+        /* Estilos para el formset */
+        .pagos-section {
+            margin-top: 20px;
+            border-top: 1px solid #ccc;
+            padding-top: 15px;
+        }
+        .pagos-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+        .pagos-table th, .pagos-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .btn-agregar {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
         @media (max-width: 768px) {
             .form-grid { grid-template-columns: 1fr; }
             .form-group.full-width { grid-column: span 1; }
@@ -47,42 +71,73 @@
                 {% csrf_token %}
                 
                 <div class="form-grid">
-                    <!-- ORDEN: Tarjeta, Persona, Tipo, Establecimiento -->
+                    <!-- Tarjeta -->
                     <div class="form-group">
                         <label for="id_tarjeta" class="required-field">Tarjeta</label>
                         {{ form.tarjeta }}
                     </div>
                     
+                    <!-- Persona -->
                     <div class="form-group">
                         <label for="id_persona" class="required-field">Persona</label>
                         {{ form.persona }}
                     </div>
                     
+                    <!-- Tipo -->
                     <div class="form-group">
                         <label for="id_tipo" class="required-field">Tipo de movimiento</label>
                         {{ form.tipo }}
                     </div>
                     
+                    <!-- Establecimiento (solo compras) -->
                     <div class="form-group" id="establecimiento-group">
                         <label for="id_establecimiento" id="establecimiento-label">Establecimiento</label>
                         {{ form.establecimiento }}
                         <div class="estado-info" id="establecimiento-info"></div>
                     </div>
-                    
+
+                    <!-- Monto -->
                     <div class="form-group">
                         <label for="id_monto" class="required-field">Monto ($)</label>
                         {{ form.monto }}
                     </div>
                     
+                    <!-- Fecha -->
                     <div class="form-group">
                         <label for="id_fecha" class="required-field">Fecha</label>
                         {{ form.fecha }}
                     </div>
                     
+                    <!-- Descripción -->
                     <div class="form-group full-width">
                         <label for="id_descripcion">Descripción</label>
                         {{ form.descripcion }}
                     </div>
+                </div>
+
+                <!-- SECCIÓN DE DISTRIBUCIÓN DE PAGOS (solo para PAGO) -->
+                <div id="pagos-distribucion" class="pagos-section" style="display: none;">
+                    <h3>Distribuir pago entre compras</h3>
+                    {{ formset.management_form }}
+                    <table class="pagos-table" id="pagos-table">
+                        <thead>
+                            <tr>
+                                <th>Compra</th>
+                                <th>Monto a aplicar</th>
+                                <th>Eliminar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pagos-tbody">
+                            {% for pago_form in formset %}
+                            <tr class="pago-fila">
+                                <td>{{ pago_form.compra }}</td>
+                                <td>{{ pago_form.monto_aplicado }}</td>
+                                <td>{{ pago_form.DELETE }} Eliminar</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    <button type="button" id="agregar-fila" class="btn btn-secondary btn-agregar">➕ Agregar otra compra</button>
                 </div>
                 
                 <div class="form-actions">
@@ -98,72 +153,238 @@
     </div>
     
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const tipoSelect = document.getElementById('id_tipo');
-            const establecimientoGroup = document.getElementById('establecimiento-group');
-            const establecimientoSelect = document.getElementById('id_establecimiento');
-            const establecimientoLabel = document.getElementById('establecimiento-label');
-            const establecimientoInfo = document.getElementById('establecimiento-info');
-            
-            // Guardar el valor original del select cuando se deshabilita
-            let valorOriginal = '';
-            
-            function actualizarEstablecimiento() {
-                const tipo = tipoSelect.value;
-                
-                if (tipo === 'COMPRA') {
-                    // ✅ HABILITADO - COMPRA: Requiere establecimiento
-                    establecimientoSelect.disabled = false;
-                    establecimientoSelect.required = true;
-                    establecimientoGroup.style.opacity = '1';
-                    establecimientoLabel.className = 'required-field';
-                    establecimientoLabel.innerHTML = 'Establecimiento';
-                    establecimientoInfo.innerHTML = 'Selecciona el establecimiento de la compra';
-                    establecimientoInfo.style.color = '#10b981';
-                    
-                    // Restaurar el valor guardado si existe
-                    if (valorOriginal) {
-                        establecimientoSelect.value = valorOriginal;
+    document.addEventListener('DOMContentLoaded', function() {
+        // Elementos del formulario principal
+        const tipoSelect = document.getElementById('id_tipo');
+        const personaSelect = document.getElementById('id_persona');
+        const establecimientoGroup = document.getElementById('establecimiento-group');
+        const establecimientoSelect = document.getElementById('id_establecimiento');
+        const establecimientoLabel = document.getElementById('establecimiento-label');
+        const establecimientoInfo = document.getElementById('establecimiento-info');
+        
+        // Elementos de la sección de pagos
+        const pagosDistribucion = document.getElementById('pagos-distribucion');
+        const pagosTbody = document.getElementById('pagos-tbody');
+        const totalForms = document.getElementById('id_pagos-TOTAL_FORMS');
+        let formNum = parseInt(totalForms.value);
+        
+        // Variable para guardar el valor original del establecimiento
+        let valorOriginalEstablecimiento = '';
+
+        // Función para cargar compras de la persona seleccionada en todos los selects del formset
+        function cargarComprasEnSelects(personaId) {
+            if (!personaId) {
+                document.querySelectorAll('[id$="-compra"]').forEach(select => {
+                    select.innerHTML = '<option value="">---------</option>';
+                });
+                return;
+            }
+
+            fetch(`/api/compras/${personaId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    document.querySelectorAll('[id$="-compra"]').forEach(select => {
+                        let valorActual = select.value;
+                        select.innerHTML = '<option value="">---------</option>';
+                        data.forEach(compra => {
+                            const option = document.createElement('option');
+                            option.value = compra.id;
+                            option.textContent = compra.texto;
+                            option.setAttribute('data-saldo', compra.saldo); // ← GUARDAMOS EL SALDO
+                            select.appendChild(option);
+                        });
+                        // Restaurar valor si aún existe
+                        if (valorActual && Array.from(select.options).some(opt => opt.value === valorActual)) {
+                            select.value = valorActual;
+                        }
+                        // Actualizar el campo de monto según la selección actual
+                        actualizarMontoPorSelect(select);
+                    });
+                })
+                .catch(error => console.error('Error al cargar compras:', error));
+        }
+
+        // Función para actualizar el input de monto basado en la compra seleccionada
+        function actualizarMontoPorSelect(select) {
+            const fila = select.closest('tr');
+            const montoInput = fila.querySelector('input[type="number"]');
+            const selectedOption = select.options[select.selectedIndex];
+            const saldo = selectedOption ? selectedOption.getAttribute('data-saldo') : 0;
+            if (montoInput) {
+                if (saldo) {
+                    montoInput.max = saldo;
+                    montoInput.placeholder = `Máx: $${parseFloat(saldo).toFixed(2)}`;
+                    // Si el valor actual es mayor que el nuevo máximo, lo ajustamos
+                    if (parseFloat(montoInput.value) > parseFloat(saldo)) {
+                        montoInput.value = saldo;
                     }
                 } else {
-                    // ❌ DESHABILITADO - PAGO/OTROS: No requiere establecimiento
-                    // Guardar el valor actual antes de deshabilitar
-                    if (establecimientoSelect.value) {
-                        valorOriginal = establecimientoSelect.value;
+                    montoInput.removeAttribute('max');
+                    montoInput.placeholder = 'Monto a aplicar';
+                }
+            }
+        }
+
+        // Función para actualizar la visibilidad de campos según el tipo
+        function actualizarCampos() {
+            const tipo = tipoSelect.value;
+            
+            if (tipo === 'COMPRA') {
+                establecimientoSelect.disabled = false;
+                establecimientoSelect.required = true;
+                establecimientoGroup.style.opacity = '1';
+                establecimientoLabel.className = 'required-field';
+                establecimientoLabel.innerHTML = 'Establecimiento';
+                establecimientoInfo.innerHTML = 'Selecciona el establecimiento de la compra';
+                establecimientoInfo.style.color = '#10b981';
+                
+                if (valorOriginalEstablecimiento) {
+                    establecimientoSelect.value = valorOriginalEstablecimiento;
+                }
+                pagosDistribucion.style.display = 'none';
+                
+            } else if (tipo === 'PAGO') {
+                if (establecimientoSelect.value) {
+                    valorOriginalEstablecimiento = establecimientoSelect.value;
+                }
+                establecimientoSelect.disabled = true;
+                establecimientoSelect.required = false;
+                establecimientoSelect.value = '';
+                establecimientoGroup.style.opacity = '0.8';
+                establecimientoLabel.className = 'opcional-field';
+                establecimientoLabel.innerHTML = 'Establecimiento (no requerido)';
+                establecimientoInfo.innerHTML = 'No aplica para este tipo de movimiento';
+                establecimientoInfo.style.color = '#6b7280';
+                
+                pagosDistribucion.style.display = 'block';
+                
+                if (personaSelect.value) {
+                    cargarComprasEnSelects(personaSelect.value);
+                }
+            } else {
+                if (establecimientoSelect.value) {
+                    valorOriginalEstablecimiento = establecimientoSelect.value;
+                }
+                establecimientoSelect.disabled = true;
+                establecimientoSelect.required = false;
+                establecimientoSelect.value = '';
+                establecimientoGroup.style.opacity = '0.8';
+                establecimientoLabel.className = 'opcional-field';
+                establecimientoLabel.innerHTML = 'Establecimiento (no requerido)';
+                establecimientoInfo.innerHTML = 'No aplica para este tipo de movimiento';
+                establecimientoInfo.style.color = '#6b7280';
+                
+                pagosDistribucion.style.display = 'none';
+            }
+        }
+
+        // Manejo del formset: agregar nuevas filas
+        function initFormset() {
+            document.getElementById('agregar-fila').addEventListener('click', function() {
+                const primeraFila = document.querySelector('.pago-fila');
+                if (!primeraFila) return;
+                
+                const newRow = primeraFila.cloneNode(true);
+                const regex = new RegExp(`pagos-(\\d+)-`, 'g');
+                
+                newRow.innerHTML = newRow.innerHTML.replace(regex, `pagos-${formNum}-`);
+                newRow.querySelectorAll('input, select').forEach(input => {
+                    if (input.name) {
+                        input.name = input.name.replace(regex, `pagos-${formNum}-`);
+                        input.id = input.id.replace(regex, `pagos-${formNum}-`);
+                        if (input.type !== 'hidden') {
+                            input.value = '';
+                            // Eliminar atributos que puedan causar conflictos
+                            input.removeAttribute('max');
+                            input.placeholder = '';
+                        }
                     }
-                    
-                    establecimientoSelect.disabled = true;
-                    establecimientoSelect.required = false;
-                    establecimientoSelect.value = ''; // Limpiar el valor
-                    establecimientoGroup.style.opacity = '0.8';
-                    establecimientoLabel.className = 'opcional-field';
-                    establecimientoLabel.innerHTML = 'Establecimiento (no requerido)';
-                    establecimientoInfo.innerHTML = 'No aplica para este tipo de movimiento';
-                    establecimientoInfo.style.color = '#6b7280';
+                });
+                
+                pagosTbody.appendChild(newRow);
+                formNum++;
+                totalForms.value = formNum;
+                
+                // Si hay persona seleccionada, llenamos el nuevo select
+                if (personaSelect.value) {
+                    // La función cargarComprasEnSelects actualizará todos los selects, incluido el nuevo
+                    cargarComprasEnSelects(personaSelect.value);
+                }
+                
+                // Asignar evento change al nuevo select
+                const nuevoSelect = newRow.querySelector('select');
+                if (nuevoSelect) {
+                    nuevoSelect.addEventListener('change', function() {
+                        actualizarMontoPorSelect(this);
+                    });
+                }
+            });
+        }
+
+        // Asignar eventos change a todos los selects existentes
+        function asignarEventosASelects() {
+            document.querySelectorAll('[id$="-compra"]').forEach(select => {
+                select.addEventListener('change', function() {
+                    actualizarMontoPorSelect(this);
+                });
+            });
+        }
+
+        // Evento: cuando cambia la persona, recargar compras si estamos en modo pago
+        personaSelect.addEventListener('change', function() {
+            if (tipoSelect.value === 'PAGO') {
+                cargarComprasEnSelects(this.value);
+            }
+        });
+
+        // Inicializar
+        actualizarCampos();
+        initFormset();
+        asignarEventosASelects();
+
+        // Actualizar cuando cambie el tipo
+        tipoSelect.addEventListener('change', actualizarCampos);
+
+        // Validación antes de enviar
+        document.getElementById('movimientoForm').addEventListener('submit', function(e) {
+            const tipo = tipoSelect.value;
+            const establecimiento = establecimientoSelect.value;
+            
+            if (tipo === 'COMPRA' && !establecimiento) {
+                e.preventDefault();
+                alert('⚠️ Debes seleccionar un establecimiento para registrar una compra');
+                establecimientoSelect.focus();
+                return false;
+            }
+            
+            if (tipo === 'PAGO') {
+                const filas = document.querySelectorAll('.pago-fila');
+                let algunaValida = false;
+                for (let fila of filas) {
+                    const compraSelect = fila.querySelector('select');
+                    const montoInput = fila.querySelector('input[type="number"]');
+                    if (compraSelect && compraSelect.value && montoInput && montoInput.value && parseFloat(montoInput.value) > 0) {
+                        // Verificar que no exceda el saldo (por si acaso el atributo max no funciona)
+                        const saldo = compraSelect.options[compraSelect.selectedIndex]?.getAttribute('data-saldo');
+                        if (saldo && parseFloat(montoInput.value) > parseFloat(saldo)) {
+                            alert(`El monto para la compra seleccionada no puede exceder $${parseFloat(saldo).toFixed(2)}`);
+                            montoInput.focus();
+                            e.preventDefault();
+                            return false;
+                        }
+                        algunaValida = true;
+                    }
+                }
+                if (!algunaValida) {
+                    e.preventDefault();
+                    alert('⚠️ Debes agregar al menos una compra con monto válido para el pago');
+                    return false;
                 }
             }
             
-            // Ejecutar al cargar
-            actualizarEstablecimiento();
-            
-            // Ejecutar cada vez que cambie el tipo
-            tipoSelect.addEventListener('change', actualizarEstablecimiento);
-            
-            // Validar antes de enviar
-            document.getElementById('movimientoForm').addEventListener('submit', function(e) {
-                const tipo = tipoSelect.value;
-                const establecimiento = establecimientoSelect.value;
-                
-                if (tipo === 'COMPRA' && !establecimiento) {
-                    e.preventDefault();
-                    alert('⚠️ Debes seleccionar un establecimiento para registrar una compra');
-                    establecimientoSelect.focus();
-                    return false;
-                }
-                
-                return true;
-            });
+            return true;
         });
+    });
     </script>
 </body>
 </html>
