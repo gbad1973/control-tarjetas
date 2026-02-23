@@ -180,7 +180,7 @@
                     </select>
                 </div>
                 
-                <!-- TARJETA DE CRÉDITO -->
+                <!-- TARJETA DE CRÉDITO (con cashback) -->
                 <div class="tarjeta-info color-banamex" id="infoTarjeta">
                     <div class="tarjeta-chip"></div>
                     
@@ -194,7 +194,8 @@
                     
                     <div class="tarjeta-numero" id="infoNumero">**** **** **** ****</div>
                     
-                    <div class="info-grid">
+                    <!-- NUEVO: Ajustamos grid a 5 columnas y añadimos cashback -->
+                    <div class="info-grid" style="grid-template-columns: repeat(5, 1fr);">
                         <div class="info-item">
                             <span class="info-label">Límite</span>
                             <span class="info-value moneda" id="infoLimite">$0.00</span>
@@ -210,6 +211,11 @@
                         <div class="info-item">
                             <span class="info-label">Usuarios</span>
                             <span class="info-value" id="infoPersonas">0</span>
+                        </div>
+                        <!-- NUEVO: Cashback Total -->
+                        <div class="info-item">
+                            <span class="info-label">Cashback</span>
+                            <span class="info-value moneda" id="infoCashback">$0.00</span>
                         </div>
                     </div>
                 </div>
@@ -266,7 +272,8 @@
         const disponibleTotal = document.getElementById('disponibleTotal');
         const personasActivas = document.getElementById('personasActivas');
         const totalMovimientos = document.getElementById('totalMovimientos');
-        const totalCashback = document.getElementById('totalCashback'); // NUEVO
+        const totalCashback = document.getElementById('totalCashback');
+        const infoCashback = document.getElementById('infoCashback'); // NUEVO
         const personasContainer = document.getElementById('personasContainer');
         
         // Mapeo de bancos a colores
@@ -319,18 +326,23 @@
                 disponibleTotal.textContent = '$0.00';
                 personasActivas.textContent = '0';
                 totalMovimientos.textContent = '0';
-                totalCashback.textContent = '$0.00'; // NUEVO
+                totalCashback.textContent = '$0.00';
+                infoCashback.textContent = '$0.00'; // NUEVO
                 return;
             }
             
             try {
-                const response = await fetch(`/tarjetas/api/personas/${tarjetaId}/`);
+                const response = await fetch(`/tarjetas/api/personas/${tarjetaId}/?_=${Date.now()}`);
                 const data = await response.json();
+                
+                // 🔍 DEPURACIÓN: Mostrar el valor de cashback_total en consola
+                console.log('cashback_total desde API:', data.cashback_total);
                 
                 disponibleTotal.textContent = formatoMoneda(data.disponible_total || 0);
                 personasActivas.textContent = data.personas_count || 0;
                 totalMovimientos.textContent = data.movimientos_count || 0;
-                totalCashback.textContent = formatoMoneda(data.cashback_total || 0); // NUEVO
+                totalCashback.textContent = formatoMoneda(data.cashback_total || 0);
+                infoCashback.textContent = formatoMoneda(data.cashback_total || 0); // NUEVO
                 
                 renderizarPersonas(data.personas || []);
             } catch (error) {
@@ -436,7 +448,8 @@
                 disponibleTotal.textContent = '$0.00';
                 personasActivas.textContent = '0';
                 totalMovimientos.textContent = '0';
-                totalCashback.textContent = '$0.00'; // NUEVO
+                totalCashback.textContent = '$0.00';
+                infoCashback.textContent = '$0.00'; // NUEVO
             }
         });
         
