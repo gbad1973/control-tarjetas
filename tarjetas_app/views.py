@@ -65,6 +65,15 @@ def dashboard(request):
     total_limite = tarjetas.aggregate(total=Sum('limite_credito'))['total'] or 0
     total_saldo = tarjetas.aggregate(total=Sum('saldo_actual'))['total'] or 0
     total_disponible = total_limite - total_saldo
+    total_cashback = Movimiento.objects.filter(tipo='COMPRA').aggregate(total=Sum('monto_cashback'))['total'] or 0
+    for persona in personas:  # personas es el queryset de personas de la tarjeta seleccionada
+        cashback_persona = Movimiento.objects.filter(
+            persona=persona,
+            tarjeta=tarjeta_seleccionada
+        ).aggregate(total=Sum('monto_cashback'))['total'] or 0
+        persona.cashback = cashback_persona  # Agregamos atributo dinámico
+     
+        
     
     context = {
         'personas': personas,
@@ -74,6 +83,8 @@ def dashboard(request):
         'total_saldo': total_saldo,
         'total_disponible': total_disponible,
         'total_movimientos': Movimiento.objects.count(),
+        'total_cashback' : total_cashback,
+        'personas': personas, 
     }
     return render(request, 'tarjetas_app/dashboard.html', context)
 
@@ -477,7 +488,7 @@ def eliminar_movimiento(request, movimiento_id):
 # ========== API PARA DASHBOARD ==========
 @login_required
 def api_personas_tarjeta(request, tarjeta_id):
-    """API para obtener personas y estadísticas de una tarjeta específica"""
+    """API para obtener personas y estadísticas de una tarjeta específica, incluyendo cashback"""
     try:
         tarjeta = Tarjeta.objects.get(id=tarjeta_id, activa=True)
     except Tarjeta.DoesNotExist:
@@ -486,6 +497,12 @@ def api_personas_tarjeta(request, tarjeta_id):
     personas = tarjeta.usuarios.filter(activo=True)
     movimientos_count = Movimiento.objects.filter(tarjeta=tarjeta).count()
     
+    # Calcular cashback total de la tarjeta (suma de monto_cashback de todas las compras)
+    cashback_total = Movimiento.objects.filter(
+        tarjeta=tarjeta,
+        tipo='COMPRA'
+    ).aggregate(total=Sum('monto_cashback'))['total'] or 0
+    
     personas_data = []
     for persona in personas:
         movimientos = Movimiento.objects.filter(
@@ -493,6 +510,7 @@ def api_personas_tarjeta(request, tarjeta_id):
             persona=persona
         )
         
+        # Deuda total en esta tarjeta
         deuda_total = 0
         for mov in movimientos:
             if mov.tipo in ['COMPRA', 'COMISION', 'INTERES']:
@@ -500,12 +518,18 @@ def api_personas_tarjeta(request, tarjeta_id):
             elif mov.tipo in ['PAGO', 'CASHBACK']:
                 deuda_total -= mov.monto
         
+        # Cashback generado por esta persona en esta tarjeta
+        cashback_persona = movimientos.filter(tipo='COMPRA').aggregate(
+            total=Sum('monto_cashback')
+        )['total'] or 0
+        
         personas_data.append({
             'id': persona.id,
             'nombre': persona.nombre,
             'activo': persona.activo,
             'deuda_total': float(deuda_total),
-            'total_movimientos': movimientos.count()
+            'total_movimientos': movimientos.count(),
+            'cashback_generado': float(cashback_persona),  # ← NUEVO
         })
     
     response_data = {
@@ -513,6 +537,7 @@ def api_personas_tarjeta(request, tarjeta_id):
         'disponible_total': float(tarjeta.saldo_disponible()),
         'personas_count': personas.count(),
         'movimientos_count': movimientos_count,
+        'cashback_total': float(cashback_total),  # ← NUEVO
         'personas': personas_data
     }
     

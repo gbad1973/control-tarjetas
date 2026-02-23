@@ -5,636 +5,96 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Control de Tarjetas</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-        
-        .dashboard-wrapper {
-            width: 100%;
-            max-width: 1400px;
-            height: 95vh;
-            min-height: 700px;
-        }
-        
-        .dashboard-container {
-            display: grid;
-            grid-template-columns: 280px 1fr;
-            gap: 0;
-            height: 100%;
-            background: white;
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
-        }
-        
-        /* Panel Lateral Izquierdo */
-        .sidebar {
-            background: linear-gradient(180deg, #4f46e5 0%, #7c3aed 100%);
-            color: white;
-            padding: 25px 0;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .sidebar-header {
-            padding: 0 30px 20px 30px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            margin-bottom: 15px;
-        }
-        
-        .sidebar-header h2 {
-            font-size: 1.35rem;
-            font-weight: 700;
-            margin-bottom: 5px;
-            line-height: 1.2;
-            white-space: nowrap;
-        }
-        
-        .sidebar-header p {
-            font-size: 1.3rem;
-            font-weight: 700;
-            opacity: 0.8;
-            line-height: 1.2;
-        }
-        
-        .sidebar-actions {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            padding: 0 25px;
-        }
-        
-        .sidebar-action {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px 15px;
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            transition: all 0.2s ease;
-            font-size: 0.9rem;
-            margin-bottom: 0;
-            background: rgba(255, 255, 255, 0.05);
-            border: none;
-            cursor: pointer;
-            font-weight: 500;
-            width: 100%;
-            text-align: left;
-        }
-        
-        .sidebar-action:hover {
-            background: linear-gradient(90deg, rgba(16, 185, 129, 0.15), rgba(52, 211, 153, 0.25));
-            transform: translateX(3px);
-            box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);
-            border-left: 4px solid #10B981;
-        }
-        
-        .sidebar-catalogos {
-            margin-top: 15px;
-            padding: 15px 25px 0 25px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .sidebar-catalogos h3 {
-            font-size: 1.35rem;
-            font-weight: 700;
-            margin-bottom: 12px;
-            opacity: 0.95;
-            line-height: 1.2;
-        }
-        
-        .catalogo-btn {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 15px;
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            transition: all 0.2s ease;
-            font-size: 0.9rem;
-            margin-bottom: 8px;
-            background: rgba(255, 255, 255, 0.05);
-        }
-        
-        .catalogo-btn:hover {
-            background: linear-gradient(90deg, rgba(16, 185, 129, 0.15), rgba(52, 211, 153, 0.25));
-            transform: translateX(3px);
-            box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);
-            border-left: 4px solid #10B981;
-        }
-        
-        .main-content {
-            padding: 20px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-        
-        .main-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 5px;
-        }
-        
-        .main-header h1 {
-            color: #1f2937;
-            font-size: 1.7rem;
-            font-weight: 600;
-        }
-        
-        .logout-btn {
-            background: #f3f4f6;
-            color: #6b7280;
-            border: none;
-            padding: 9px 16px;
-            border-radius: 10px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            text-decoration: none;
-        }
-        
-        .logout-btn:hover {
-            background: #e5e7eb;
-        }
-        
-        .tarjeta-selector {
-            background: #f8fafc;
-            border-radius: 12px;
-            padding: 16px;
-            border: 1px solid #e5e7eb;
-        }
-        
-        .selector-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 12px;
-        }
-        
-        .selector-header h3 {
-            color: #1f2937;
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
-        
-        .tarjeta-select {
-            width: 100%;
-            padding: 10px 14px;
-            border: 2px solid #e5e7eb;
-            border-radius: 10px;
-            font-size: 0.9rem;
-            background: white;
-            cursor: pointer;
-            transition: border-color 0.2s ease;
-        }
-        
-        .tarjeta-select:focus {
-            outline: none;
-            border-color: #4f46e5;
-        }
-        
-        /* TARJETA DE CRÉDITO - POSICIÓN ORIGINAL */
-        /*.tarjeta-info {
-            background: linear-gradient(135deg, #0033A0 0%, #0047AB 100%);
-            border-radius: 16px;
-            padding: 25px 30px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            width: 60%;  /* ← CAMBIA ESTE VALOR */
-        /*    max-width: 700px;  /* ← CAMBIA ESTE VALOR */
-        /*    height: auto;  /* ← ALTO FIJO */
-        /*    margin: 0 auto;  /* ← ESTO LA CENTRA */
-        /*    color: white;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            display: none;
-        } */
-       
-
-
-        .tarjeta-info {
-            background: linear-gradient(135deg, #0033A0 0%, #0047AB 100%);
-            border-radius: 12px;
-            padding: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            display: none;
-            width: 65%; /* REDUCIDO A 85% (antes 90%) */
-            max-width: 800px; /* REDUCIDO (antes 800px) */
-            margin: 0 auto; /* Centrada */
-            color: white;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            min-height: 320px;
-        }
-        
-        .tarjeta-info.visible {
-            display: block;
-        }
-        
+        /* (Mantén tus estilos exactamente como están, no los cambio) */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        .dashboard-wrapper { width: 100%; max-width: 1400px; height: 95vh; min-height: 700px; }
+        .dashboard-container { display: grid; grid-template-columns: 280px 1fr; gap: 0; height: 100%; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15); }
+        .sidebar { background: linear-gradient(180deg, #4f46e5 0%, #7c3aed 100%); color: white; padding: 25px 0; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 0 30px 20px 30px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 15px; }
+        .sidebar-header h2 { font-size: 1.35rem; font-weight: 700; margin-bottom: 5px; line-height: 1.2; white-space: nowrap; }
+        .sidebar-header p { font-size: 1.3rem; font-weight: 700; opacity: 0.8; line-height: 1.2; }
+        .sidebar-actions { flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 0 25px; }
+        .sidebar-action { display: flex; align-items: center; gap: 10px; padding: 12px 15px; color: white; text-decoration: none; border-radius: 8px; transition: all 0.2s ease; font-size: 0.9rem; margin-bottom: 0; background: rgba(255, 255, 255, 0.05); border: none; cursor: pointer; font-weight: 500; width: 100%; text-align: left; }
+        .sidebar-action:hover { background: linear-gradient(90deg, rgba(16, 185, 129, 0.15), rgba(52, 211, 153, 0.25)); transform: translateX(3px); box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2); border-left: 4px solid #10B981; }
+        .sidebar-catalogos { margin-top: 15px; padding: 15px 25px 0 25px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+        .sidebar-catalogos h3 { font-size: 1.35rem; font-weight: 700; margin-bottom: 12px; opacity: 0.95; line-height: 1.2; }
+        .catalogo-btn { display: flex; align-items: center; gap: 8px; padding: 12px 15px; color: white; text-decoration: none; border-radius: 8px; transition: all 0.2s ease; font-size: 0.9rem; margin-bottom: 8px; background: rgba(255, 255, 255, 0.05); }
+        .catalogo-btn:hover { background: linear-gradient(90deg, rgba(16, 185, 129, 0.15), rgba(52, 211, 153, 0.25)); transform: translateX(3px); box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2); border-left: 4px solid #10B981; }
+        .main-content { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+        .main-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .main-header h1 { color: #1f2937; font-size: 1.7rem; font-weight: 600; }
+        .logout-btn { background: #f3f4f6; color: #6b7280; border: none; padding: 9px 16px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; gap: 6px; text-decoration: none; }
+        .logout-btn:hover { background: #e5e7eb; }
+        .tarjeta-selector { background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e5e7eb; }
+        .selector-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .selector-header h3 { color: #1f2937; font-size: 1.1rem; font-weight: 600; }
+        .tarjeta-select { width: 100%; padding: 10px 14px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 0.9rem; background: white; cursor: pointer; transition: border-color 0.2s ease; }
+        .tarjeta-select:focus { outline: none; border-color: #4f46e5; }
+        .tarjeta-info { background: linear-gradient(135deg, #0033A0 0%, #0047AB 100%); border-radius: 12px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.1); display: none; width: 65%; max-width: 800px; margin: 0 auto; color: white; position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2); min-height: 320px; }
+        .tarjeta-info.visible { display: block; }
         .tarjeta-info.color-banamex { background: linear-gradient(135deg, #0033A0 0%, #0047AB 100%); }
         .tarjeta-info.color-banorte { background: linear-gradient(135deg, #DA291C 0%, #E53935 100%); }
         .tarjeta-info.color-bbva { background: linear-gradient(135deg, #0072CE 0%, #00A0E9 100%); }
         .tarjeta-info.color-santander { background: linear-gradient(135deg, #EC0000 0%, #FF5252 100%); }
         .tarjeta-info.color-hsbc { background: linear-gradient(135deg, #DB0011 0%, #FF1A1A 100%); }
         .tarjeta-info.color-scotiabank { background: linear-gradient(135deg, #ED1C24 0%, #FF5252 100%); }
-        
-        .tarjeta-info::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 100%;
-            background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
-            z-index: 1;
-            pointer-events: none;
-        }
-        
-        .tarjeta-chip {
-            width: 45px;
-            height: 35px;
-            background: linear-gradient(135deg, #FFD700, #FFA500);
-            border-radius: 8px;
-            position: relative;
-            margin-bottom: 15px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            z-index: 2;
-        }
-        
-        .tarjeta-chip::after {
-            content: '';
-            position: absolute;
-            top: 6px;
-            left: 6px;
-            right: 6px;
-            bottom: 6px;
-            border: 1px solid rgba(255,255,255,0.5);
-            border-radius: 4px;
-        }
-        
-        .tarjeta-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 20px;
-            position: relative;
-            z-index: 2;
-        }
-        
-        .banco-info {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        
-        .banco-nombre {
-            font-size: 1.4rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        
-        .tarjeta-tipo {
-            font-size: 0.9rem;
-            background: rgba(255, 255, 255, 0.2);
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-weight: 600;
-            display: inline-block;
-            width: fit-content;
-        }
-        
-        .tarjeta-estado {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            backdrop-filter: blur(5px);
-        }
-        
-        .tarjeta-numero {
-            font-family: 'Courier New', monospace;
-            font-size: 1.6rem;
-            letter-spacing: 3px;
-            margin: 15px 0 25px 0;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            font-weight: 600;
-            text-align: center;
-            z-index: 2;
-            padding: 10px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            backdrop-filter: blur(5px);
-        }
-        
-        .info-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 15px;
-            margin-top: 10px;
-            z-index: 2;
-            position: relative;
-        }
-        
-        .info-item {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-            padding: 12px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        
-        .info-label {
-            color: rgba(255, 255, 255, 0.9);
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .info-value {
-            color: white;
-            font-size: 1.2rem;
-            font-weight: 700;
-            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-        }
-        
-        .moneda {
-            font-family: 'Courier New', monospace;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 15px;
-            margin-top: 5px;
-        }
-        
-        .stat-card {
-            background: white;
-            border-radius: 12px;
-            padding: 15px;
-            border: 1px solid #e5e7eb;
-            text-align: center;
-            transition: all 0.2s ease;
-            height: 100px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            cursor: pointer;
-        }
-        
-        .stat-card:hover {
-            border-color: #4f46e5;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1);
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-        }
-        
-        .stat-icon {
-            font-size: 1.4rem;
-            margin-bottom: 8px;
-            opacity: 0.8;
-        }
-        
-        .stat-value {
-            color: #4f46e5;
-            font-size: 1.3rem;
-            font-weight: 700;
-            margin: 5px 0;
-        }
-        
-        .stat-label {
-            color: #6b7280;
-            font-size: 0.8rem;
-        }
-        
-        .personas-section {
-            margin-top: 10px;
-        }
-        
-        .section-title {
-            color: #1f2937;
-            font-size: 1.2rem;
-            margin-bottom: 15px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .personas-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 15px;
-        }
-        
-        .persona-card {
-            background: white;
-            border-radius: 12px;
-            padding: 18px;
-            border: 1px solid #e5e7eb;
-            transition: all 0.2s ease;
-        }
-        
-        .persona-card:hover {
-            border-color: #4f46e5;
-            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1);
-        }
-        
-        .persona-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 15px;
-        }
-        
-        .persona-avatar {
-            width: 45px;
-            height: 45px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.1rem;
-            font-weight: bold;
-        }
-        
-        .persona-details h3 {
-            color: #1f2937;
-            font-size: 1.1rem;
-            margin-bottom: 4px;
-        }
-        
-        .persona-details p {
-            color: #6b7280;
-            font-size: 0.85rem;
-        }
-        
-        .persona-stats {
-            margin-bottom: 15px;
-            background: #f8fafc;
-            padding: 12px;
-            border-radius: 10px;
-        }
-        
-        .persona-stat {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-        
-        .persona-stat:last-child {
-            margin-bottom: 0;
-        }
-        
-        .stat-name {
-            color: #6b7280;
-            font-size: 0.9rem;
-        }
-        
-        .stat-amount {
-            color: #1f2937;
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
-        
-        .stat-amount.positivo {
-            color: #ef4444;
-        }
-        
-        .stat-amount.negativo {
-            color: #10b981;
-        }
-        
-        .persona-actions {
-            display: flex;
-            gap: 10px;
-        }
-        
-        .btn {
-            padding: 10px 15px;
-            border: none;
-            border-radius: 10px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            flex: 1;
-        }
-        
-        .btn-primary {
-            background: linear-gradient(to right, #4f46e5, #7c3aed);
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 10px rgba(79, 70, 229, 0.2);
-        }
-        
-        .btn-secondary {
-            background: #f3f4f6;
-            color: #6b7280;
-        }
-        
-        .btn-secondary:hover {
-            background: #e5e7eb;
-        }
-        
-        .dashboard-footer {
-            margin-top: 15px;
-            text-align: center;
-        }
-        
-        .ver-movimientos {
-            background: linear-gradient(to right, #10b981, #34d399);
-            color: white;
-            border: none;
-            padding: 14px 25px;
-            border-radius: 12px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            text-decoration: none;
-            width: 100%;
-            justify-content: center;
-        }
-        
-        .ver-movimientos:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.2);
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
+        .tarjeta-info::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 100%; background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%); z-index: 1; pointer-events: none; }
+        .tarjeta-chip { width: 45px; height: 35px; background: linear-gradient(135deg, #FFD700, #FFA500); border-radius: 8px; position: relative; margin-bottom: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); z-index: 2; }
+        .tarjeta-chip::after { content: ''; position: absolute; top: 6px; left: 6px; right: 6px; bottom: 6px; border: 1px solid rgba(255,255,255,0.5); border-radius: 4px; }
+        .tarjeta-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; position: relative; z-index: 2; }
+        .banco-info { display: flex; flex-direction: column; gap: 5px; }
+        .banco-nombre { font-size: 1.4rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+        .tarjeta-tipo { font-size: 0.9rem; background: rgba(255, 255, 255, 0.2); padding: 4px 12px; border-radius: 20px; font-weight: 600; display: inline-block; width: fit-content; }
+        .tarjeta-estado { background: rgba(255, 255, 255, 0.2); padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; backdrop-filter: blur(5px); }
+        .tarjeta-numero { font-family: 'Courier New', monospace; font-size: 1.6rem; letter-spacing: 3px; margin: 15px 0 25px 0; text-shadow: 0 2px 4px rgba(0,0,0,0.3); font-weight: 600; text-align: center; z-index: 2; padding: 10px; background: rgba(255, 255, 255, 0.1); border-radius: 12px; backdrop-filter: blur(5px); }
+        .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 10px; z-index: 2; position: relative; }
+        .info-item { display: flex; flex-direction: column; gap: 5px; padding: 12px; background: rgba(255, 255, 255, 0.1); border-radius: 10px; backdrop-filter: blur(5px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .info-label { color: rgba(255, 255, 255, 0.9); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .info-value { color: white; font-size: 1.2rem; font-weight: 700; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4); }
+        .moneda { font-family: 'Courier New', monospace; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-top: 5px; }
+        .stat-card { background: white; border-radius: 12px; padding: 15px; border: 1px solid #e5e7eb; text-align: center; transition: all 0.2s ease; height: 100px; display: flex; flex-direction: column; justify-content: center; cursor: pointer; }
+        .stat-card:hover { border-color: #4f46e5; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1); background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); }
+        .stat-icon { font-size: 1.4rem; margin-bottom: 8px; opacity: 0.8; }
+        .stat-value { color: #4f46e5; font-size: 1.3rem; font-weight: 700; margin: 5px 0; }
+        .stat-label { color: #6b7280; font-size: 0.8rem; }
+        .personas-section { margin-top: 10px; }
+        .section-title { color: #1f2937; font-size: 1.2rem; margin-bottom: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .personas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; }
+        .persona-card { background: white; border-radius: 12px; padding: 18px; border: 1px solid #e5e7eb; transition: all 0.2s ease; }
+        .persona-card:hover { border-color: #4f46e5; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1); }
+        .persona-header { display: flex; align-items: center; gap: 12px; margin-bottom: 15px; }
+        .persona-avatar { width: 45px; height: 45px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.1rem; font-weight: bold; }
+        .persona-details h3 { color: #1f2937; font-size: 1.1rem; margin-bottom: 4px; }
+        .persona-details p { color: #6b7280; font-size: 0.85rem; }
+        .persona-stats { margin-bottom: 15px; background: #f8fafc; padding: 12px; border-radius: 10px; }
+        .persona-stat { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .persona-stat:last-child { margin-bottom: 0; }
+        .stat-name { color: #6b7280; font-size: 0.9rem; }
+        .stat-amount { color: #1f2937; font-size: 1.1rem; font-weight: 600; }
+        .stat-amount.positivo { color: #ef4444; }
+        .stat-amount.negativo { color: #10b981; }
+        .persona-actions { display: flex; gap: 10px; }
+        .btn { padding: 10px 15px; border: none; border-radius: 10px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: 1; }
+        .btn-primary { background: linear-gradient(to right, #4f46e5, #7c3aed); color: white; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(79, 70, 229, 0.2); }
+        .btn-secondary { background: #f3f4f6; color: #6b7280; }
+        .btn-secondary:hover { background: #e5e7eb; }
+        .dashboard-footer { margin-top: 15px; text-align: center; }
+        .ver-movimientos { background: linear-gradient(to right, #10b981, #34d399); color: white; border: none; padding: 14px 25px; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 10px; text-decoration: none; width: 100%; justify-content: center; }
+        .ver-movimientos:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(16, 185, 129, 0.2); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         @media (max-width: 1024px) {
-            .dashboard-container {
-                grid-template-columns: 240px 1fr;
-            }
-            .info-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            .tarjeta-numero {
-                font-size: 1.4rem;
-            }
+            .dashboard-container { grid-template-columns: 240px 1fr; }
+            .info-grid { grid-template-columns: repeat(2, 1fr); }
+            .tarjeta-numero { font-size: 1.4rem; }
         }
-        
         @media (max-width: 768px) {
-            .dashboard-container {
-                grid-template-columns: 1fr;
-            }
-            .sidebar {
-                display: none;
-            }
-            .info-grid {
-                grid-template-columns: 1fr;
-            }
-            .tarjeta-numero {
-                font-size: 1.2rem;
-            }
+            .dashboard-container { grid-template-columns: 1fr; }
+            .sidebar { display: none; }
+            .info-grid { grid-template-columns: 1fr; }
+            .tarjeta-numero { font-size: 1.2rem; }
         }
     </style>
 </head>
@@ -720,7 +180,7 @@
                     </select>
                 </div>
                 
-                <!-- TARJETA DE CRÉDITO - POSICIÓN ORIGINAL -->
+                <!-- TARJETA DE CRÉDITO -->
                 <div class="tarjeta-info color-banamex" id="infoTarjeta">
                     <div class="tarjeta-chip"></div>
                     
@@ -754,7 +214,7 @@
                     </div>
                 </div>
                 
-                <!-- ESTADÍSTICAS -->
+                <!-- ESTADÍSTICAS (NUEVO: CASHBACK TOTAL) -->
                 <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-icon">💰</div>
@@ -776,6 +236,12 @@
                         <div class="stat-value" id="totalMovimientos">0</div>
                         <div class="stat-label">Movimientos</div>
                     </div>
+                    <!-- NUEVA TARJETA DE CASHBACK -->
+                    <div class="stat-card">
+                        <div class="stat-icon">💰</div>
+                        <div class="stat-value" id="totalCashback">$0.00</div>
+                        <div class="stat-label">Cashback Generado</div>
+                    </div>
                 </div>
                 
                 <!-- CONTENEDOR DE PERSONAS -->
@@ -783,12 +249,12 @@
                 
                 <!-- Footer -->
                 <div class="dashboard-footer">
-    {% if tarjeta_seleccionada %}
-        <a href="{% url 'movimientos_tarjeta' tarjeta_seleccionada.id %}" class="ver-movimientos" id="btnMovimientosTarjeta">
-            📈 Ver Movimientos de esta Tarjeta
-        </a>
-    {% endif %}
-</div>
+                    {% if tarjeta_seleccionada %}
+                        <a href="{% url 'movimientos_tarjeta' tarjeta_seleccionada.id %}" class="ver-movimientos" id="btnMovimientosTarjeta">
+                            📈 Ver Movimientos de esta Tarjeta
+                        </a>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
@@ -800,6 +266,7 @@
         const disponibleTotal = document.getElementById('disponibleTotal');
         const personasActivas = document.getElementById('personasActivas');
         const totalMovimientos = document.getElementById('totalMovimientos');
+        const totalCashback = document.getElementById('totalCashback'); // NUEVO
         const personasContainer = document.getElementById('personasContainer');
         
         // Mapeo de bancos a colores
@@ -852,6 +319,7 @@
                 disponibleTotal.textContent = '$0.00';
                 personasActivas.textContent = '0';
                 totalMovimientos.textContent = '0';
+                totalCashback.textContent = '$0.00'; // NUEVO
                 return;
             }
             
@@ -862,6 +330,7 @@
                 disponibleTotal.textContent = formatoMoneda(data.disponible_total || 0);
                 personasActivas.textContent = data.personas_count || 0;
                 totalMovimientos.textContent = data.movimientos_count || 0;
+                totalCashback.textContent = formatoMoneda(data.cashback_total || 0); // NUEVO
                 
                 renderizarPersonas(data.personas || []);
             } catch (error) {
@@ -869,7 +338,7 @@
             }
         }
         
-        // Renderizar personas
+        // Renderizar personas (AHORA INCLUYE CASHBACK)
         function renderizarPersonas(personas) {
             if (!personas || personas.length === 0) {
                 personasContainer.innerHTML = `
@@ -893,6 +362,7 @@
             personas.forEach(persona => {
                 const deuda = parseFloat(persona.deuda_total) || 0;
                 const deudaClass = deuda > 0 ? 'positivo' : (deuda < 0 ? 'negativo' : '');
+                const cashback = parseFloat(persona.cashback_generado) || 0; // NUEVO
                 
                 html += `
                     <div class="persona-card">
@@ -911,6 +381,11 @@
                             <div class="persona-stat">
                                 <span class="stat-name">📊 Movimientos</span>
                                 <span class="stat-amount">${persona.total_movimientos || 0}</span>
+                            </div>
+                            <!-- NUEVA LÍNEA PARA CASHBACK POR PERSONA -->
+                            <div class="persona-stat">
+                                <span class="stat-name">💰 Cashback</span>
+                                <span class="stat-amount">${formatoMoneda(cashback)}</span>
                             </div>
                         </div>
                         <div class="persona-actions">
@@ -961,6 +436,7 @@
                 disponibleTotal.textContent = '$0.00';
                 personasActivas.textContent = '0';
                 totalMovimientos.textContent = '0';
+                totalCashback.textContent = '$0.00'; // NUEVO
             }
         });
         
@@ -974,8 +450,8 @@
             }
         }, 100);
         {% endif %}
-
-                // Reemplazar el ID 0 en la URL de detalle con el ID real de la persona
+        
+        // Reemplazar el ID 0 en la URL de detalle (si es necesario)
         document.addEventListener('click', function(e) {
             if (e.target.closest('.btn-primary') && e.target.closest('.btn-primary').href.includes('detalle_persona/0')) {
                 e.preventDefault();
@@ -990,6 +466,7 @@
                 }
             }
         });
+        
         // Actualizar link de movimientos cuando cambia la tarjeta
         selectorTarjeta.addEventListener('change', function(e) {
             const tarjetaId = e.target.value;
@@ -998,7 +475,6 @@
                 btnMovimientos.href = `/tarjeta/${tarjetaId}/movimientos/`;
             }
         });
-
     </script>
 </body>
 </html>
