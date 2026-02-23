@@ -523,6 +523,23 @@ def api_personas_tarjeta(request, tarjeta_id):
             total=Sum('monto_cashback')
         )['total'] or 0
         
+        #*********************************************************
+        cashback_total = Movimiento.objects.filter(
+            tarjeta=tarjeta,
+            tipo='COMPRA'
+        ).aggregate(total=Sum('monto_cashback'))['total'] or 0
+
+        # 🔍 LOGS DE DEPURACIÓN
+        print(f"=== DEBUG api_personas_tarjeta para tarjeta {tarjeta_id} ===")
+        print(f"Cashback total calculado: {cashback_total}")
+        print(f"Personas encontradas: {personas.count()}")
+        for p in personas:
+            print(f"  Persona: {p.nombre} (ID: {p.id})")
+              
+                      
+        #*********************************************************
+        
+        
         personas_data.append({
             'id': persona.id,
             'nombre': persona.nombre,
