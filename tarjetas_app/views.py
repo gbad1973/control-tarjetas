@@ -505,7 +505,10 @@ def api_personas_tarjeta(request, tarjeta_id):
         tipo='COMPRA'
     ).aggregate(total=Sum('monto_cashback'))['total'] or 0
 
+
     # Logs de depuración
+    # 🔍 LOGS DE DEPURACIÓN (fuera del bucle)
+
     print(f"=== DEBUG api_personas_tarjeta para tarjeta {tarjeta_id} ===")
     print(f"Cashback total calculado: {cashback_total}")
     print(f"Personas encontradas: {personas.count()}")
