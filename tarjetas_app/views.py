@@ -1,4 +1,3 @@
-# tarjetas_app/views.py
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -485,7 +484,10 @@ def eliminar_movimiento(request, movimiento_id):
         'volver_url': 'lista_movimientos'
     })
 
+
+
 # ========== API PARA DASHBOARD ==========
+
 @login_required
 def api_personas_tarjeta(request, tarjeta_id):
     """API para obtener personas y estadísticas de una tarjeta específica, incluyendo cashback"""
@@ -502,6 +504,13 @@ def api_personas_tarjeta(request, tarjeta_id):
         tarjeta=tarjeta,
         tipo='COMPRA'
     ).aggregate(total=Sum('monto_cashback'))['total'] or 0
+
+    # Logs de depuración
+    print(f"=== DEBUG api_personas_tarjeta para tarjeta {tarjeta_id} ===")
+    print(f"Cashback total calculado: {cashback_total}")
+    print(f"Personas encontradas: {personas.count()}")
+    for p in personas:
+        print(f"  Persona: {p.nombre} (ID: {p.id})")
     
     personas_data = []
     for persona in personas:
@@ -523,30 +532,13 @@ def api_personas_tarjeta(request, tarjeta_id):
             total=Sum('monto_cashback')
         )['total'] or 0
         
-        #*********************************************************
-        cashback_total = Movimiento.objects.filter(
-            tarjeta=tarjeta,
-            tipo='COMPRA'
-        ).aggregate(total=Sum('monto_cashback'))['total'] or 0
-
-        # 🔍 LOGS DE DEPURACIÓN
-        print(f"=== DEBUG api_personas_tarjeta para tarjeta {tarjeta_id} ===")
-        print(f"Cashback total calculado: {cashback_total}")
-        print(f"Personas encontradas: {personas.count()}")
-        for p in personas:
-            print(f"  Persona: {p.nombre} (ID: {p.id})")
-              
-                      
-        #*********************************************************
-        
-        
         personas_data.append({
             'id': persona.id,
             'nombre': persona.nombre,
             'activo': persona.activo,
             'deuda_total': float(deuda_total),
             'total_movimientos': movimientos.count(),
-            'cashback_generado': float(cashback_persona),  # ← NUEVO
+            'cashback_generado': float(cashback_persona),
         })
     
     response_data = {
@@ -554,18 +546,21 @@ def api_personas_tarjeta(request, tarjeta_id):
         'disponible_total': float(tarjeta.saldo_disponible()),
         'personas_count': personas.count(),
         'movimientos_count': movimientos_count,
-        'cashback_total': float(cashback_total),  # ← NUEVO
+        'cashback_total': float(cashback_total),
         'personas': personas_data
     }
     
+    print(f"RESPONSE_DATA: {response_data}")
     return JsonResponse(response_data)
 
-# ========== DETALLE PERSONA (MODIFICADA) ==========
+
+
+# ======================  DETALLE PERSONA. ===================================
 @login_required
 def detalle_persona(request, persona_id):
     persona = get_object_or_404(Persona, id=persona_id)
     tarjetas = Tarjeta.objects.filter(usuarios=persona)
-
+ 
     tarjeta_id = request.GET.get('tarjeta')
     # Obtener todas las compras (incluyendo comisiones e intereses) ordenadas por fecha ascendente
     compras = Movimiento.objects.filter(
@@ -598,6 +593,7 @@ def detalle_persona(request, persona_id):
         'pagos_sin_asignar': pagos_sin_asignar,
     }
     return render(request, 'tarjetas_app/detalle_persona.html', context)
+
 
 # ********** MOVIMIENTOS TARJETAS ************************************
 @login_required
