@@ -173,6 +173,7 @@ def nueva_tarjeta(request):
     })
 
 # ========== NUEVO MOVIMIENTO (COMPLETO CON COMPRAS A MESES) ==========
+# ========== NUEVO MOVIMIENTO (CORREGIDO CON CASHBACK) ==========
 @login_required
 def nuevo_movimiento(request):
     if request.method == 'POST':
@@ -185,26 +186,31 @@ def nuevo_movimiento(request):
             movimiento = form.save(commit=False)
             print(f"Tipo de movimiento: {movimiento.tipo}")
             
-            # ===== MANEJO DE COMPRAS A MESES =====
+            # ===== CÁLCULO DE CASHBACK PARA COMPRAS (NORMALES Y A MESES) =====
             if movimiento.tipo == 'COMPRA':
                 # Verificar si es a meses desde el POST
                 es_a_meses = request.POST.get('es_a_meses') == 'on'
+                
                 if es_a_meses:
                     movimiento.es_a_meses = True
                     movimiento.numero_meses = request.POST.get('numero_meses')
                     if movimiento.numero_meses:
                         movimiento.numero_meses = int(movimiento.numero_meses)
                         movimiento.monto_mensual = movimiento.monto / movimiento.numero_meses
-                        movimiento.meses_pagados = 0  # Inicia en 0, NO hay mensualidades aún
-                        
-                        # Calcular cashback total si aplica
-                        if movimiento.establecimiento and movimiento.establecimiento.porcentaje_cashback > 0:
-                            porcentaje = movimiento.establecimiento.porcentaje_cashback / 100
-                            movimiento.monto_cashback = movimiento.monto * porcentaje
+                        movimiento.meses_pagados = 0
                 else:
                     movimiento.es_a_meses = False
                     movimiento.numero_meses = None
                     movimiento.monto_mensual = None
+                
+                # ===== CALCULAR CASHBACK PARA TODAS LAS COMPRAS =====
+                if movimiento.establecimiento and movimiento.establecimiento.porcentaje_cashback > 0:
+                    porcentaje = movimiento.establecimiento.porcentaje_cashback / 100
+                    movimiento.monto_cashback = movimiento.monto * porcentaje
+                    print(f"💰 Cashback calculado: ${movimiento.monto_cashback} ({movimiento.establecimiento.porcentaje_cashback}%)")
+                else:
+                    movimiento.monto_cashback = 0
+                    print("ℹ️ Establecimiento sin cashback")
             
             if movimiento.tipo != 'COMPRA':
                 movimiento.establecimiento = None
@@ -214,7 +220,7 @@ def nuevo_movimiento(request):
 
             # ===== SI ES UN PAGO, PROCESAR LA RELACIÓN =====
             if movimiento.tipo == 'PAGO':
-                # Obtener el ID del item a pagar desde el campo oculto
+                # ... (el resto del código de pago queda igual) ...
                 item_pagado_id = request.POST.get('compra_relacionada')
                 monto_pagado = movimiento.monto
                 
@@ -226,15 +232,13 @@ def nuevo_movimiento(request):
                         item_pagado = Movimiento.objects.get(id=item_pagado_id)
                         print(f"✅ Item encontrado: {item_pagado.tipo} - {item_pagado.descripcion}")
                         
-                        # Verificar que no se pague más del saldo
                         pagado_actual = item_pagado.pagos_recibidos.aggregate(total=Sum('monto_aplicado'))['total'] or 0
                         saldo_restante = item_pagado.monto - pagado_actual
                         
-                        if monto_pagado > saldo_restante + 0.01:  # Tolerancia por decimales
+                        if monto_pagado > saldo_restante + 0.01:
                             messages.error(request, f'El monto a pagar (${monto_pagado}) excede el saldo restante (${saldo_restante})')
                             return redirect('nuevo_movimiento')
                         
-                        # Crear relación PagoCompra
                         relacion = PagoCompra.objects.create(
                             pago=movimiento,
                             compra_id=item_pagado.id,
@@ -242,13 +246,11 @@ def nuevo_movimiento(request):
                         )
                         print(f"✅ Relación PagoCompra creada con ID: {relacion.id}")
                         
-                        # Si es una mensualidad, NO incrementar meses_pagados aquí
                         if item_pagado.tipo == 'MENSUALIDAD':
                             print(f"💰 Mensualidad {item_pagado.id} pagada correctamente")
                         
                         messages.success(request, f'✅ Pago aplicado correctamente')
                         
-                        # Actualizar saldo de la tarjeta
                         movimiento.tarjeta.actualizar_saldo()
                         print(f"💰 Saldo de tarjeta actualizado")
                         
