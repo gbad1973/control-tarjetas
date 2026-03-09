@@ -34,6 +34,7 @@ urlpatterns = [
     path('tarjetas/nueva/', views.nueva_tarjeta, name='nueva_tarjeta'),
     path('establecimientos/nuevo/', views.nuevo_establecimiento, name='nuevo_establecimiento'),
     path('movimientos/nuevo/', views.nuevo_movimiento, name='nuevo_movimiento'),
+    path('cargar-mensualidad/<int:compra_id>/', views.cargar_mensualidad, name='cargar_mensualidad'),
     
     # EDITAR Y ELIMINAR
     path('tarjetas/editar/<int:tarjeta_id>/', views.editar_tarjeta, name='editar_tarjeta'),

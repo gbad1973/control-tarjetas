@@ -29,6 +29,46 @@
         .required-field::after { content: " *"; color: #ef4444; font-weight: bold; }
         .opcional-field::after { content: " (opcional)"; color: #6b7280; font-size: 0.8rem; font-weight: normal; }
         .estado-info { font-size: 0.8rem; margin-top: 4px; color: #6b7280; }
+        /* Estilos para compras a meses */
+        .meses-opciones {
+            grid-column: span 2;
+            margin-top: 10px;
+            padding: 20px;
+            background: #f0f9ff;
+            border-radius: 12px;
+            border: 1px solid #bae6fd;
+        }
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .checkbox-container input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        .checkbox-container label {
+            margin-bottom: 0;
+            cursor: pointer;
+            color: #0369a1;
+        }
+        .meses-selector {
+            display: none;
+            margin-top: 15px;
+        }
+        .meses-selector select {
+            max-width: 200px;
+        }
+        .monto-mensual-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            color: #0369a1;
+            font-weight: 500;
+        }
         /* Estilos para el formset */
         .pagos-section {
             margin-top: 20px;
@@ -69,6 +109,9 @@
         <div class="form-container">
             <form method="post" id="movimientoForm">
                 {% csrf_token %}
+
+                <!-- CAMPO OCULTO PARA COMPRA_RELACIONADA (REQUERIDO POR EL FORMULARIO) -->
+                <input type="hidden" name="compra_relacionada" id="id_compra_relacionada" value="">
                 
                 <div class="form-grid">
                     <!-- Tarjeta -->
@@ -113,6 +156,30 @@
                         <label for="id_descripcion">Descripción</label>
                         {{ form.descripcion }}
                     </div>
+
+                    <!-- SECCIÓN NUEVA: Opciones para compras a meses -->
+                    <div id="meses-opciones" class="meses-opciones" style="display: none;">
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="id_es_a_meses" name="es_a_meses">
+                            <label for="id_es_a_meses">¿Esta compra es a meses?</label>
+                        </div>
+                        
+                        <div id="meses-selector" class="meses-selector">
+                            <label for="id_numero_meses">Número de meses:</label>
+                            <select id="id_numero_meses" name="numero_meses" class="form-control">
+                                <option value="">--- Selecciona ---</option>
+                                <option value="3">3 meses</option>
+                                <option value="6">6 meses</option>
+                                <option value="9">9 meses</option>
+                                <option value="12">12 meses</option>
+                                <option value="18">18 meses</option>
+                                <option value="24">24 meses</option>
+                            </select>
+                            <div id="monto-mensual-info" class="monto-mensual-info">
+                                Monto mensual: $<span id="monto-mensual">0.00</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- SECCIÓN DE DISTRIBUCIÓN DE PAGOS (solo para PAGO) -->
@@ -122,7 +189,7 @@
                     <table class="pagos-table" id="pagos-table">
                         <thead>
                             <tr>
-                                <th>Compra</th>
+                                <th>Compra / Mensualidad</th>
                                 <th>Monto a aplicar</th>
                                 <th>Eliminar</th>
                             </tr>
@@ -171,6 +238,44 @@
         // Variable para guardar el valor original del establecimiento
         let valorOriginalEstablecimiento = '';
 
+        // ===== NUEVO: Elementos para compras a meses =====
+        const mesesOpciones = document.getElementById('meses-opciones');
+        const esAMesesCheckbox = document.getElementById('id_es_a_meses');
+        const mesesSelector = document.getElementById('meses-selector');
+        const numeroMesesSelect = document.getElementById('id_numero_meses');
+        const montoInput = document.getElementById('id_monto');
+        const montoMensualSpan = document.getElementById('monto-mensual');
+
+        // Elemento oculto para compra_relacionada
+        const compraRelacionadaInput = document.getElementById('id_compra_relacionada');
+
+        // Función para calcular monto mensual
+        function calcularMontoMensual() {
+            const monto = parseFloat(montoInput.value) || 0;
+            const meses = parseInt(numeroMesesSelect.value) || 1;
+            const mensual = monto / meses;
+            montoMensualSpan.textContent = mensual.toFixed(2);
+        }
+
+        // Eventos para cálculo de monto mensual
+        if (montoInput) {
+            montoInput.addEventListener('input', calcularMontoMensual);
+        }
+        if (numeroMesesSelect) {
+            numeroMesesSelect.addEventListener('change', calcularMontoMensual);
+        }
+
+        // Mostrar/ocultar selector de meses según checkbox
+        if (esAMesesCheckbox) {
+            esAMesesCheckbox.addEventListener('change', function() {
+                mesesSelector.style.display = this.checked ? 'block' : 'none';
+                if (!this.checked) {
+                    numeroMesesSelect.value = '';
+                    montoMensualSpan.textContent = '0.00';
+                }
+            });
+        }
+
         // Función para cargar compras de la persona seleccionada en todos los selects del formset
         function cargarComprasEnSelects(personaId) {
             if (!personaId) {
@@ -190,7 +295,7 @@
                             const option = document.createElement('option');
                             option.value = compra.id;
                             option.textContent = compra.texto;
-                            option.setAttribute('data-saldo', compra.saldo); // ← GUARDAMOS EL SALDO
+                            option.setAttribute('data-saldo', compra.saldo);
                             select.appendChild(option);
                         });
                         // Restaurar valor si aún existe
@@ -214,7 +319,6 @@
                 if (saldo) {
                     montoInput.max = saldo;
                     montoInput.placeholder = `Máx: $${parseFloat(saldo).toFixed(2)}`;
-                    // Si el valor actual es mayor que el nuevo máximo, lo ajustamos
                     if (parseFloat(montoInput.value) > parseFloat(saldo)) {
                         montoInput.value = saldo;
                     }
@@ -243,6 +347,9 @@
                 }
                 pagosDistribucion.style.display = 'none';
                 
+                // MOSTRAR opciones de meses para COMPRA
+                mesesOpciones.style.display = 'block';
+                
             } else if (tipo === 'PAGO') {
                 if (establecimientoSelect.value) {
                     valorOriginalEstablecimiento = establecimientoSelect.value;
@@ -257,6 +364,7 @@
                 establecimientoInfo.style.color = '#6b7280';
                 
                 pagosDistribucion.style.display = 'block';
+                mesesOpciones.style.display = 'none'; // OCULTAR opciones de meses
                 
                 if (personaSelect.value) {
                     cargarComprasEnSelects(personaSelect.value);
@@ -275,6 +383,7 @@
                 establecimientoInfo.style.color = '#6b7280';
                 
                 pagosDistribucion.style.display = 'none';
+                mesesOpciones.style.display = 'none'; // OCULTAR opciones de meses
             }
         }
 
@@ -294,7 +403,6 @@
                         input.id = input.id.replace(regex, `pagos-${formNum}-`);
                         if (input.type !== 'hidden') {
                             input.value = '';
-                            // Eliminar atributos que puedan causar conflictos
                             input.removeAttribute('max');
                             input.placeholder = '';
                         }
@@ -305,17 +413,18 @@
                 formNum++;
                 totalForms.value = formNum;
                 
-                // Si hay persona seleccionada, llenamos el nuevo select
                 if (personaSelect.value) {
-                    // La función cargarComprasEnSelects actualizará todos los selects, incluido el nuevo
                     cargarComprasEnSelects(personaSelect.value);
                 }
                 
-                // Asignar evento change al nuevo select
                 const nuevoSelect = newRow.querySelector('select');
                 if (nuevoSelect) {
                     nuevoSelect.addEventListener('change', function() {
                         actualizarMontoPorSelect(this);
+                        // ACTUALIZAR CAMPO OCULTO CUANDO CAMBIA LA SELECCIÓN
+                        if (compraRelacionadaInput) {
+                            compraRelacionadaInput.value = this.value;
+                        }
                     });
                 }
             });
@@ -326,6 +435,10 @@
             document.querySelectorAll('[id$="-compra"]').forEach(select => {
                 select.addEventListener('change', function() {
                     actualizarMontoPorSelect(this);
+                    // ACTUALIZAR CAMPO OCULTO CUANDO CAMBIA LA SELECCIÓN
+                    if (compraRelacionadaInput) {
+                        compraRelacionadaInput.value = this.value;
+                    }
                 });
             });
         }
@@ -357,14 +470,26 @@
                 return false;
             }
             
+            // Validación para compras a meses
+            if (tipo === 'COMPRA' && esAMesesCheckbox && esAMesesCheckbox.checked) {
+                if (!numeroMesesSelect.value) {
+                    e.preventDefault();
+                    alert('⚠️ Debes seleccionar el número de meses para la compra a meses');
+                    numeroMesesSelect.focus();
+                    return false;
+                }
+            }
+            
             if (tipo === 'PAGO') {
                 const filas = document.querySelectorAll('.pago-fila');
                 let algunaValida = false;
+                let primerIdValido = null;
+                
                 for (let fila of filas) {
                     const compraSelect = fila.querySelector('select');
                     const montoInput = fila.querySelector('input[type="number"]');
+                    
                     if (compraSelect && compraSelect.value && montoInput && montoInput.value && parseFloat(montoInput.value) > 0) {
-                        // Verificar que no exceda el saldo (por si acaso el atributo max no funciona)
                         const saldo = compraSelect.options[compraSelect.selectedIndex]?.getAttribute('data-saldo');
                         if (saldo && parseFloat(montoInput.value) > parseFloat(saldo)) {
                             alert(`El monto para la compra seleccionada no puede exceder $${parseFloat(saldo).toFixed(2)}`);
@@ -373,12 +498,21 @@
                             return false;
                         }
                         algunaValida = true;
+                        if (!primerIdValido) {
+                            primerIdValido = compraSelect.value;
+                        }
                     }
                 }
+                
                 if (!algunaValida) {
                     e.preventDefault();
                     alert('⚠️ Debes agregar al menos una compra con monto válido para el pago');
                     return false;
+                }
+                
+                // ASEGURAR QUE EL CAMPO OCULTO TENGA UN VALOR
+                if (primerIdValido && compraRelacionadaInput) {
+                    compraRelacionadaInput.value = primerIdValido;
                 }
             }
             

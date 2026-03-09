@@ -16,6 +16,8 @@
         .btn-success { background: linear-gradient(to right, #10b981, #34d399); color: white; }
         .btn-danger { background: linear-gradient(to right, #ef4444, #f87171); color: white; }
         .btn-secondary { background: #f3f4f6; color: #6b7280; }
+        .btn-warning { background: linear-gradient(to right, #f59e0b, #fbbf24); color: white; }
+        .btn-sm { padding: 4px 8px; font-size: 0.75rem; }
         .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(79,70,229,0.2); }
         
         .info-card { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; border-radius: 12px; padding: 15px 20px; margin-bottom: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
@@ -56,25 +58,106 @@
         .badge { padding: 4px 10px; border-radius: 16px; font-size: 0.7rem; font-weight: 600; display: inline-block; }
         .badge-cargo { background: #fee2e2; color: #7f1d1d; }
         .badge-abono { background: #dcfce7; color: #14532d; }
-        .monto-cargo { color: #ef4444; font-weight: 600; }
-        .monto-abono { color: #10b981; font-weight: 600; }
+        .badge-success { background: #10b981; color: white; }
+        .badge-info { background: #3b82f6; color: white; }
+        
+        /* ===== ESTILOS DE COLORES (LOS IMPORTANTES) ===== */
+        .monto-cargo {
+            color: #ef4444 !important;
+            font-weight: 600;
+        }
+        .monto-abono {
+            color: #10b981 !important;
+            font-weight: 600;
+        }
         .text-right { text-align: right; }
+        
         .compra-row { background-color: #f9fafc; font-weight: 500; border-top: 2px solid #4f46e5; }
         .pago-row { background-color: #ffffff; }
-        .pago-row td:first-child { padding-left: 30px; } /* Sangría para pagos */
-        .pago-row td { color: #059669; } /* Color verde para los pagos */
+        .pago-row td:first-child { padding-left: 30px; }
+        .pago-row td { color: #059669; }
         .sin-pagos { font-style: italic; color: #6b7280; }
         .saldo-pendiente { font-weight: bold; }
-        .compra-pagada { opacity: 0.7; }
         
         .acciones { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap; }
         
-        /* Estilos de impresión (se mantienen igual) */
+        /* Estilos para la sección de mensualidades */
+        .mensualidades-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f0f9ff;
+            border-radius: 12px;
+            border: 1px solid #bae6fd;
+        }
+        .mensualidades-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #0369a1;
+            margin-bottom: 15px;
+        }
+        .mensualidad-card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .mensualidad-info {
+            flex: 1;
+        }
+        .mensualidad-descripcion {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 5px;
+        }
+        .mensualidad-progreso {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+        }
+        .progreso-bar {
+            width: 150px;
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progreso-fill {
+            height: 100%;
+            background: #10b981;
+            border-radius: 4px;
+        }
+        .btn-cargar {
+            background: linear-gradient(to right, #10b981, #34d399);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.9rem;
+            display: inline-block;
+        }
+        .btn-cargar:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16,185,129,0.3);
+        }
+        .btn-cargar.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+            background: #9ca3af;
+        }
+        
         @media print {
             body { background: white; padding: 0.5in; }
             .container { box-shadow: none; padding: 0; max-width: 100%; }
             .btn, .acciones, .filtros, .info-card, .tarjeta-seleccionada, .resumen, 
-            .header a, .dashboard-footer, .sidebar, [class*="btn"] {
+            .header a, .dashboard-footer, .sidebar, [class*="btn"], .mensualidades-section {
                 display: none !important;
             }
             .header h1 { display: block !important; font-size: 16pt; color: black; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
@@ -101,6 +184,8 @@
             .tarjeta-saldo { flex-direction: column; gap: 8px; width: 100%; }
             .saldo-item { align-items: flex-start; }
             .header h1 { font-size: 1.2rem; }
+            .mensualidad-card { flex-direction: column; align-items: flex-start; }
+            .btn-cargar { width: 100%; text-align: center; }
         }
     </style>
     {% load humanize %}
@@ -205,7 +290,7 @@
         
         <!-- BOTONES DE EXPORTACIÓN -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h2 style="color: #1f2937; font-size: 1rem; font-weight: 600;">📋 Compras y Pagos</h2>
+            <h2 style="color: #1f2937; font-size: 1rem; font-weight: 600;">📋 Movimientos</h2>
             <div style="display: flex; gap: 8px;">
                 <button onclick="exportarExcel()" class="btn btn-success" type="button">
                     📊 Excel
@@ -216,81 +301,105 @@
             </div>
         </div>
         
-        <!-- TABLA DE COMPRAS CON SUS PAGOS -->
+        <!-- TABLA DE MOVIMIENTOS -->
         <div class="tabla-container">
             <table id="tablaMovimientos">
                 <thead>
                     <tr>
                         <th>Fecha</th>
+                        <th>Persona</th>
                         <th>Tarjeta</th>
-                        <th>Tipo</th>
                         <th>Establecimiento</th>
                         <th>Descripción</th>
                         <th class="text-right">Cargo</th>
                         <th class="text-right">Abono</th>
-                        <th class="text-right">Saldo Pendiente</th>
+                        <th class="text-right">Cashback</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for compra in compras %}
-                    <!-- Fila de la compra -->
-                    <tr class="compra-row">
-                        <td>{{ compra.fecha|date:"d/m/Y" }}</td>
-                        <td>{{ compra.tarjeta.banco }}</td>
-                        <td><span class="badge badge-cargo">{{ compra.get_tipo_display|slice:":4" }}</span></td>
-                        <td>{{ compra.establecimiento.nombre|default:"-" }}</td>
-                        <td>{{ compra.descripcion|truncatechars:25 }}</td>
-                        <td class="text-right monto-cargo">${{ compra.monto|floatformat:2|intcomma }}</td>
-                        <td class="text-right">-</td>
-                        <td class="text-right {% if compra.saldo_pendiente > 0 %}monto-cargo{% else %}monto-abono{% endif %}">
-                            ${{ compra.saldo_pendiente|floatformat:2|intcomma }}
-                        </td>
-                    </tr>
-                    <!-- Pagos asociados a esta compra (a través de pagos_recibidos) -->
-                    {% for pago_compra in compra.pagos_recibidos.all %}
-                    <tr class="pago-row">
-                        <td>{{ pago_compra.pago.fecha|date:"d/m/Y" }}</td>
-                        <td>{{ pago_compra.pago.tarjeta.banco }}</td>
-                        <td><span class="badge badge-abono">{{ pago_compra.pago.get_tipo_display|slice:":4" }}</span></td>
-                        <td>-</td>
-                        <td>{{ pago_compra.pago.descripcion|truncatechars:25 }}</td>
-                        <td class="text-right">-</td>
-                        <td class="text-right monto-abono">${{ pago_compra.monto_aplicado|floatformat:2|intcomma }}</td>
-                        <td class="text-right">-</td>
-                    </tr>
-                    {% endfor %}
+                    {% for movimiento in movimientos_combinados %}
+                        {% if movimiento.tipo == 'PAGO' %}
+                            <!-- PAGO (verde) -->
+                            <tr class="pago-row">
+                                <td>{{ movimiento.fecha|date:"d/m/Y" }}</td>
+                                <td>{{ movimiento.persona.nombre }}</td>
+                                <td>{{ movimiento.tarjeta.banco }} - ****{{ movimiento.tarjeta.numero|slice:"-4:" }}</td>
+                                <td>-</td>
+                                <td>{{ movimiento.descripcion|truncatechars:25 }}</td>
+                                <td class="text-right">-</td>
+                                <td class="text-right monto-abono">${{ movimiento.monto|floatformat:2|intcomma }}</td>
+                                <td class="text-right">-</td>
+                            </tr>
+                        {% else %}
+                            <!-- COMPRA O MENSUALIDAD (rojo + cashback) -->
+                            <tr class="compra-row">
+                                <td>{{ movimiento.fecha|date:"d/m/Y" }}</td>
+                                <td>{{ movimiento.persona.nombre }}</td>
+                                <td>{{ movimiento.tarjeta.banco }} - ****{{ movimiento.tarjeta.numero|slice:"-4:" }}</td>
+                                <td>{{ movimiento.establecimiento.nombre|default:"-" }}</td>
+                                <td>{{ movimiento.descripcion|truncatechars:25 }}</td>
+                                <td class="text-right monto-cargo">${{ movimiento.monto|floatformat:2|intcomma }}</td>
+                                <td class="text-right">-</td>
+                                <td class="text-right monto-abono">
+                                    {% if movimiento.monto_cashback > 0 %}
+                                        ${{ movimiento.monto_cashback|floatformat:2|intcomma }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endif %}
                     {% empty %}
-                    <tr><td colspan="8" style="text-align: center;">No hay compras</td></tr>
+                        <tr><td colspan="8" style="text-align: center;">No hay movimientos</td></tr>
                     {% endfor %}
-
-                    <!-- Pagos no asignados -->
-                    {% if pagos_sin_asignar %}
-                    <tr><td colspan="8" style="background:#f0f0f0; text-align: center;">⚠️ Pagos sin compra asignada</td></tr>
-                    {% for pago in pagos_sin_asignar %}
-                    <tr class="pago-row">
-                        <td>{{ pago.fecha|date:"d/m/Y" }}</td>
-                        <td>{{ pago.tarjeta.banco }}</td>
-                        <td><span class="badge badge-abono">{{ pago.get_tipo_display|slice:":4" }}</span></td>
-                        <td>-</td>
-                        <td>{{ pago.descripcion|truncatechars:25 }}</td>
-                        <td class="text-right">-</td>
-                        <td class="text-right monto-abono">${{ pago.monto|floatformat:2|intcomma }}</td>
-                        <td class="text-right">-</td>
-                    </tr>
-                    {% endfor %}
-                    {% endif %}
                 </tbody>
-                <tfoot style="background: #f8fafc; font-weight: 600; font-size: 0.8rem;">
+                <tfoot>
                     <tr>
                         <td colspan="5" style="text-align: right;">Totales:</td>
                         <td class="text-right monto-cargo" id="totalCargoColumna">$0.00</td>
                         <td class="text-right monto-abono" id="totalAbonoColumna">$0.00</td>
-                        <td class="text-right" id="totalSaldoColumna">$0.00</td>
+                        <td class="text-right monto-abono" id="totalCashbackColumna">$0.00</td>
                     </tr>
                 </tfoot>
             </table>
         </div>
-        
+
+        <!-- SECCIÓN DE MENSUALIDADES - CORREGIDA Y FUNCIONAL -->
+        {% if compras_meses %}
+        <div class="mensualidades-section">
+            <div class="mensualidades-title">
+                📅 Compras a meses - Cargar mensualidades
+            </div>
+            
+            {% for compra in compras_meses %}
+                <div class="mensualidad-card">
+                    <div class="mensualidad-info">
+                        <div class="mensualidad-descripcion">
+                            {{ compra.descripcion|truncatechars:50 }} - Total: ${{ compra.monto|floatformat:2 }}
+                        </div>
+                        <div class="mensualidad-progreso">
+                            <span>Mensualidades cargadas: {{ compra.meses_pagados }}/{{ compra.numero_meses }}</span>
+                            <div class="progreso-bar">
+                                <div class="progreso-fill" style="width: {% widthratio compra.meses_pagados compra.numero_meses 100 %}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% if compra.meses_pagados < compra.numero_meses %}
+                        <a href="{% url 'cargar_mensualidad' compra.id %}" class="btn-cargar">
+                            ➕ Cargar mensualidad {{ compra.meses_pagados|add:1 }}/{{ compra.numero_meses }}
+                            (${{ compra.monto_mensual|floatformat:2 }})
+                        </a>
+                    {% else %}
+                        <span class="btn-cargar disabled">
+                            ✅ Completado
+                        </span>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+                
         <div class="acciones">
             <a href="{% url 'dashboard' %}" class="btn btn-primary">
                 🏠 Dashboard
@@ -299,94 +408,43 @@
     </div>
     
     <script>
-        // Función global de formato de moneda
         const formatearMoneda = (n) => '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
-        // Calcular totales
         function calcularTotales() {
-            let totalCargos = 0, totalAbonos = 0, saldo = 0;
+            let totalCargos = 0, totalAbonos = 0, totalCashback = 0;
             const filas = document.querySelectorAll('#tablaMovimientos tbody tr');
             filas.forEach(fila => {
-                if (fila.cells.length === 1) return; // Saltar filas de separación
+                if (fila.cells.length < 6) return;
+                const cargo = fila.cells[5].textContent.trim().replace('$', '').replace(/,/g, '');
+                const abono = fila.cells[6].textContent.trim().replace('$', '').replace(/,/g, '');
+                const cashback = fila.cells[7].textContent.trim().replace('$', '').replace(/,/g, '');
                 
-                const cargoCelda = fila.cells[5];
-                const abonoCelda = fila.cells[6];
-                const saldoCelda = fila.cells[7];
-                
-                if (cargoCelda && cargoCelda.textContent.trim() !== '-') {
-                    let valor = parseFloat(cargoCelda.textContent.replace('$', '').replace(/,/g, '')) || 0;
-                    totalCargos += valor;
-                }
-                if (abonoCelda && abonoCelda.textContent.trim() !== '-') {
-                    let valor = parseFloat(abonoCelda.textContent.replace('$', '').replace(/,/g, '')) || 0;
-                    totalAbonos += valor;
-                }
-                if (saldoCelda && saldoCelda.textContent.trim() !== '-') {
-                    let valor = parseFloat(saldoCelda.textContent.replace('$', '').replace(/,/g, '')) || 0;
-                    saldo += valor;
-                }
+                if (cargo && cargo !== '-') totalCargos += parseFloat(cargo) || 0;
+                if (abono && abono !== '-') totalAbonos += parseFloat(abono) || 0;
+                if (cashback && cashback !== '-') totalCashback += parseFloat(cashback) || 0;
             });
             
             document.getElementById('totalCargos').textContent = formatearMoneda(totalCargos);
             document.getElementById('totalAbonos').textContent = formatearMoneda(totalAbonos);
-            document.getElementById('totalSaldo').textContent = formatearMoneda(saldo);
+            document.getElementById('totalSaldo').textContent = formatearMoneda(totalCargos - totalAbonos);
             document.getElementById('totalCargoColumna').textContent = formatearMoneda(totalCargos);
             document.getElementById('totalAbonoColumna').textContent = formatearMoneda(totalAbonos);
-            document.getElementById('totalSaldoColumna').textContent = formatearMoneda(saldo);
+            document.getElementById('totalCashbackColumna').textContent = formatearMoneda(totalCashback);
         }
         
-        // EXPORTAR A EXCEL
-        function exportarExcel() {
-            let datos = [];
-            let encabezados = ['Fecha', 'Tarjeta', 'Tipo', 'Establecimiento', 'Descripción', 'Cargo', 'Abono', 'Saldo Pendiente'];
-            datos.push(encabezados.join(','));
-
-            let filas = document.querySelectorAll('#tablaMovimientos tbody tr');
-            filas.forEach(fila => {
-                if (fila.cells.length === 1) return;
-                
-                let filaDatos = [];
-                for (let i = 0; i <= 4; i++) {
-                    filaDatos.push(`"${fila.cells[i].textContent.trim()}"`);
-                }
-                // Cargo
-                let cargoTexto = fila.cells[5].textContent.trim().replace('$', '').replace(/,/g, '');
-                let cargoNum = cargoTexto && cargoTexto !== '-' ? parseFloat(cargoTexto) : 0;
-                filaDatos.push(`"${formatearMoneda(cargoNum)}"`);
-                // Abono
-                let abonoTexto = fila.cells[6].textContent.trim().replace('$', '').replace(/,/g, '');
-                let abonoNum = abonoTexto && abonoTexto !== '-' ? parseFloat(abonoTexto) : 0;
-                filaDatos.push(`"${formatearMoneda(abonoNum)}"`);
-                // Saldo Pendiente
-                let saldoTexto = fila.cells[7].textContent.trim().replace('$', '').replace(/,/g, '');
-                let saldoNum = saldoTexto && saldoTexto !== '-' ? parseFloat(saldoTexto) : 0;
-                filaDatos.push(`"${formatearMoneda(saldoNum)}"`);
-
-                datos.push(filaDatos.join(','));
-            });
-
-            let csv = datos.join('\n');
-            let blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
-            let link = document.createElement('a');
-            let url = URL.createObjectURL(blob);
-            link.href = url;
-            link.download = 'movimientos_{{ persona.nombre|slugify }}.csv';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        }
-
-        // EXPORTAR A PDF
-        function exportarPDF() {
-            let originalTitle = document.title;
-            document.title = 'Movimientos - {{ persona.nombre }}';
-            setTimeout(function() { window.print(); }, 100);
-            setTimeout(function() { document.title = originalTitle; }, 500);
-            return false;
-        }
-        
-        window.onload = calcularTotales;
+        window.onload = function() {
+            calcularTotales();
+            
+            // Función para exportar Excel (placeholder)
+            window.exportarExcel = function() {
+                alert('Función de exportación a Excel - Implementar según necesidad');
+            };
+            
+            // Función para exportar PDF (placeholder)
+            window.exportarPDF = function() {
+                alert('Función de exportación a PDF - Implementar según necesidad');
+            };
+        };
     </script>
 </body>
 </html>

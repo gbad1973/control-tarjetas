@@ -1,6 +1,6 @@
 # tarjetas_app/admin.py
 from django.contrib import admin
-from .models import Persona, Tarjeta, Establecimiento, Movimiento
+from .models import Persona, Tarjeta, Establecimiento, Movimiento, PagoCompra, LiberacionMensualidad
 
 # ==============================================
 # CLASE PARA OCULTAR MODELOS DEL MENÚ IZQUIERDO
@@ -19,15 +19,6 @@ class PersonaAdmin(HiddenModelAdmin):
     list_filter = ('activo',)
     search_fields = ('nombre', 'email', 'telefono')
     list_editable = ('activo',)
-    
-    # Pero SI puede accederse si se conoce la URL directa
-    # Para bloquear completamente, cambia esto a:
-    # def has_add_permission(self, request):
-    #     return False
-    # def has_change_permission(self, request):
-    #     return False
-    # def has_delete_permission(self, request):
-    #     return False
 
 # ==============================================
 # TARJETAS (VISIBLE PERO CON TEMPLATE LIMPIO)
@@ -66,6 +57,29 @@ class MovimientoAdmin(HiddenModelAdmin):
     list_filter = ('tipo', 'fecha', 'tarjeta', 'persona')
     search_fields = ('descripcion', 'persona__nombre', 'establecimiento__nombre')
     date_hierarchy = 'fecha'
+    ordering = ['fecha']  # 👈 ESTO ORDENA DE MÁS VIEJO A MÁS NUEVO
+
+# ==============================================
+# PAGOCOMPRA (VISIBLE EN EL ADMIN)
+# ==============================================
+@admin.register(PagoCompra)
+class PagoCompraAdmin(admin.ModelAdmin):
+    list_display = ('id', 'pago', 'compra', 'monto_aplicado', 'fecha')
+    list_filter = ('fecha',)
+    search_fields = ('pago__id', 'compra__id', 'pago__descripcion', 'compra__descripcion')
+    raw_id_fields = ('pago', 'compra')
+    date_hierarchy = 'fecha'
+    ordering = ['fecha']  # 👈 TAMBIÉN ORDENADO
+
+# ==============================================
+# LIBERACIONMENSUALIDAD (OPCIONAL)
+# ==============================================
+@admin.register(LiberacionMensualidad)
+class LiberacionMensualidadAdmin(admin.ModelAdmin):
+    list_display = ('id', 'movimiento', 'numero_mes', 'monto', 'fecha')
+    list_filter = ('fecha',)
+    search_fields = ('movimiento__id',)
+    ordering = ['fecha']  # 👈 TAMBIÉN ORDENADO
 
 # ==============================================
 # OPCIONAL: También oculta Grupos y Usuarios si quieres

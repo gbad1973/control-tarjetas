@@ -133,10 +133,23 @@ class EstablecimientoForm(forms.ModelForm):
             'porcentaje_cashback': 'Porcentaje de cashback (%)',
         }
 
+#=================== NUEVO MOVIMIENTO ===========================
+
 class MovimientoForm(forms.ModelForm):
+    # Campo para seleccionar la compra cuando es un PAGO
+    compra_relacionada = forms.ModelChoiceField(
+        queryset=Movimiento.objects.filter(
+            tipo__in=['COMPRA', 'MENSUALIDAD']
+        ).order_by('-fecha'),
+        required=False,
+        label="¿Qué compra estás pagando?",
+        widget=forms.Select(attrs={'class': 'form-control', 'id': 'id_compra_relacionada'})
+    )
+
     class Meta:
         model = Movimiento
-        fields = ['tarjeta', 'persona', 'establecimiento', 'tipo', 'monto', 'descripcion', 'fecha']
+        fields = ['tarjeta', 'persona', 'establecimiento', 'tipo', 'monto', 'descripcion', 'fecha', 
+                  'es_a_meses', 'numero_meses', 'compra_relacionada']  # 👈 NUEVO CAMPO
         widgets = {
             'tarjeta': forms.Select(attrs={'class': 'form-control'}),
             'persona': forms.Select(attrs={'class': 'form-control'}),
@@ -145,6 +158,12 @@ class MovimientoForm(forms.ModelForm):
             'monto': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'descripcion': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'fecha': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'es_a_meses': forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_es_a_meses'}),
+            'numero_meses': forms.Select(
+                choices=[(3, '3 meses'), (6, '6 meses'), (9, '9 meses'), (12, '12 meses'), 
+                         (18, '18 meses'), (24, '24 meses')],
+                attrs={'class': 'form-control', 'id': 'id_numero_meses'}
+            ),
         }
         labels = {
             'tarjeta': 'Tarjeta',
@@ -154,8 +173,43 @@ class MovimientoForm(forms.ModelForm):
             'monto': 'Monto',
             'descripcion': 'Descripción',
             'fecha': 'Fecha del movimiento',
+            'es_a_meses': '¿Compra a meses?',
+            'numero_meses': 'Número de meses',
+            'compra_relacionada': 'Compra que pagas',  # 👈 NUEVO LABEL
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Si el movimiento es de tipo PAGO, mostramos el campo
+        if self.instance and self.instance.tipo == 'PAGO':
+            self.fields['compra_relacionada'].required = True
+            self.fields['compra_relacionada'].widget.attrs['style'] = 'display: block;'
+        else:
+            self.fields['compra_relacionada'].widget.attrs['style'] = 'display: none;'
+
+    def clean(self):
+        cleaned_data = super().clean()
+        tipo = cleaned_data.get('tipo')
+        es_a_meses = cleaned_data.get('es_a_meses')
+        numero_meses = cleaned_data.get('numero_meses')
+        monto = cleaned_data.get('monto')
+        compra_relacionada = cleaned_data.get('compra_relacionada')
+        
+        # Si es compra a meses, validar y calcular monto mensual
+        if tipo == 'COMPRA' and es_a_meses:
+            if not numero_meses:
+                self.add_error('numero_meses', 'Debes seleccionar el número de meses')
+            else:
+                monto_mensual = monto / numero_meses
+                cleaned_data['monto_mensual'] = monto_mensual
+        
+        # Si es un PAGO, validar que tenga compra relacionada
+        if tipo == 'PAGO' and not compra_relacionada:
+            self.add_error('compra_relacionada', 'Debes seleccionar la compra que estás pagando')
+        
+        return cleaned_data
+
+# ============================================
 
 
 class PagoCompraForm(forms.ModelForm):
