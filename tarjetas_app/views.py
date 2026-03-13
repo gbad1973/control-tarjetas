@@ -173,6 +173,7 @@ def nueva_tarjeta(request):
     })
 
 # ========== NUEVO MOVIMIENTO ==========
+
 @login_required
 def nuevo_movimiento(request):
     if request.method == 'POST':
@@ -185,11 +186,8 @@ def nuevo_movimiento(request):
             movimiento = form.save(commit=False)
             print(f"Tipo de movimiento: {movimiento.tipo}")
             
-            # ===== CÁLCULO DE CASHBACK PARA COMPRAS (NORMALES Y A MESES) =====
             if movimiento.tipo == 'COMPRA':
-                # Verificar si es a meses desde el POST
                 es_a_meses = request.POST.get('es_a_meses') == 'on'
-                
                 if es_a_meses:
                     movimiento.es_a_meses = True
                     movimiento.numero_meses = request.POST.get('numero_meses')
@@ -202,14 +200,11 @@ def nuevo_movimiento(request):
                     movimiento.numero_meses = None
                     movimiento.monto_mensual = None
                 
-                # ===== CALCULAR CASHBACK PARA TODAS LAS COMPRAS =====
                 if movimiento.establecimiento and movimiento.establecimiento.porcentaje_cashback > 0:
                     porcentaje = movimiento.establecimiento.porcentaje_cashback / 100
                     movimiento.monto_cashback = movimiento.monto * porcentaje
-                    print(f"💰 Cashback calculado: ${movimiento.monto_cashback} ({movimiento.establecimiento.porcentaje_cashback}%)")
                 else:
                     movimiento.monto_cashback = 0
-                    print("ℹ️ Establecimiento sin cashback")
             
             if movimiento.tipo != 'COMPRA':
                 movimiento.establecimiento = None
@@ -217,57 +212,52 @@ def nuevo_movimiento(request):
             movimiento.save()
             print(f"✅ Movimiento guardado con ID: {movimiento.id}")
 
-            # ===== SI ES UN PAGO, PROCESAR LA RELACIÓN =====
+            # ===== SI ES UN PAGO, PROCESAR RELACIONES =====
             if movimiento.tipo == 'PAGO':
-                item_pagado_id = request.POST.get('compra_relacionada')
-                monto_pagado = movimiento.monto
+                compras_ids = []
+                montos_aplicados = []
                 
-                print(f"🔗 Item a pagar ID desde campo oculto: {item_pagado_id}")
-
-                if item_pagado_id and item_pagado_id.isdigit():
-                    try:
-                        item_pagado_id = int(item_pagado_id)
-                        item_pagado = Movimiento.objects.get(id=item_pagado_id)
-                        print(f"✅ Item encontrado: {item_pagado.tipo} - {item_pagado.descripcion}")
-                        
-                        pagado_actual = item_pagado.pagos_recibidos.aggregate(total=Sum('monto_aplicado'))['total'] or 0
-                        saldo_restante = item_pagado.monto - pagado_actual
-                        
-                        if monto_pagado > saldo_restante + 0.01:
-                            messages.error(request, f'El monto a pagar (${monto_pagado}) excede el saldo restante (${saldo_restante})')
-                            return redirect('nuevo_movimiento')
-                        
-                        relacion = PagoCompra.objects.create(
-                            pago=movimiento,
-                            compra_id=item_pagado.id,
-                            monto_aplicado=monto_pagado
-                        )
-                        print(f"✅ Relación PagoCompra creada con ID: {relacion.id}")
-                        
-                        if item_pagado.tipo == 'MENSUALIDAD':
-                            print(f"💰 Mensualidad {item_pagado.id} pagada correctamente")
-                        
-                        messages.success(request, f'✅ Pago aplicado correctamente')
-                        
-                        movimiento.tarjeta.actualizar_saldo()
-                        print(f"💰 Saldo de tarjeta actualizado")
-                        
-                    except Movimiento.DoesNotExist:
-                        print(f"❌ ERROR: No existe el item con ID {item_pagado_id}")
-                        messages.error(request, 'Error: El item seleccionado no existe')
-                    except Exception as e:
-                        print(f"❌ ERROR: {str(e)}")
-                        messages.error(request, f'Error al procesar el pago: {str(e)}')
+                total_forms = int(request.POST.get('pagos-TOTAL_FORMS', 0))
+                for i in range(total_forms):
+                    compra_id = request.POST.get(f'pagos-{i}-compra')
+                    monto = request.POST.get(f'pagos-{i}-monto_aplicado')
+                    delete = request.POST.get(f'pagos-{i}-DELETE', False)
+                    
+                    if compra_id and monto and not delete:
+                        compras_ids.append(compra_id)
+                        montos_aplicados.append(monto)
+                
+                print(f"🔗 IDs de compras a pagar: {compras_ids}")
+                print(f"💰 Montos a aplicar: {montos_aplicados}")
+                
+                if compras_ids and montos_aplicados:
+                    monto_total = 0
+                    for i, compra_id in enumerate(compras_ids):
+                        try:
+                            compra = Movimiento.objects.get(id=compra_id)
+                            monto_aplicar = Decimal(montos_aplicados[i])
+                            
+                            # Crear relación
+                            PagoCompra.objects.create(
+                                pago=movimiento,
+                                compra=compra,
+                                monto_aplicado=monto_aplicar
+                            )
+                            print(f"✅ Relación: Pago {movimiento.id} → Compra {compra.id} : ${monto_aplicar}")
+                            monto_total += monto_aplicar
+                            
+                        except Exception as e:
+                            print(f"❌ Error: {e}")
+                    
+                    messages.success(request, f'✅ Pago aplicado a {len(compras_ids)} compra(s)')
+                    movimiento.tarjeta.actualizar_saldo()
                 else:
-                    print("⚠️ Pago sin item relacionado válido")
-                    messages.warning(request, '⚠️ Pago guardado sin relación')
+                    messages.warning(request, '⚠️ Pago guardado sin compras asociadas')
 
-            messages.success(request, '✅ ¡Movimiento registrado exitosamente!')
+            messages.success(request, '✅ ¡Movimiento registrado!')
             return redirect('lista_movimientos')
         else:
             print("❌ Formulario inválido")
-            print(f"Errores del formulario: {form.errors}")
-            messages.error(request, '❌ Error en el formulario')
             return render(request, 'tarjetas_app/nuevo_movimiento.html', {
                 'form': form,
                 'formset': PagoCompraFormSet(prefix='pagos')
@@ -275,9 +265,7 @@ def nuevo_movimiento(request):
     else:
         form = MovimientoForm()
         formset = PagoCompraFormSet(prefix='pagos')
-        print("📄 GET en nuevo_movimiento")
-
-    return render(request, 'tarjetas_app/nuevo_movimiento.html', {'form': form, 'formset': formset})
+        return render(request, 'tarjetas_app/nuevo_movimiento.html', {'form': form, 'formset': formset})
 
 # ========== NUEVO ESTABLECIMIENTO ==========
 @login_required
@@ -309,75 +297,45 @@ def lista_establecimientos(request):
     return render(request, 'tarjetas_app/lista_establecimientos.html', {'establecimientos': establecimientos})
 
 # ========== LISTA MOVIMIENTOS (CORREGIDA Y AGRUPADA) ==========
+
 @login_required
 def lista_movimientos(request):
     from django.db.models import Prefetch, Sum, Q
-    from decimal import Decimal
     
-    # 1. Obtener TODOS los pagos con sus compras relacionadas
-    pagos = Movimiento.objects.filter(
-        tipo='PAGO'
-    ).prefetch_related(
-        Prefetch(
-            'pagos_a_compras',
-            queryset=PagoCompra.objects.select_related('compra', 'compra__persona', 'compra__tarjeta', 'compra__establecimiento')
-        )
-    ).select_related('persona', 'tarjeta').order_by('fecha')
+    # Obtener pagos con sus compras
+    pagos = Movimiento.objects.filter(tipo='PAGO').prefetch_related(
+        Prefetch('pagos_a_compras', queryset=PagoCompra.objects.select_related('compra'))
+    ).select_related('persona', 'tarjeta').order_by('fecha', 'id')
     
-    # 2. Obtener compras NO pagadas (las que no tienen relación en PagoCompra)
-    compras_pendientes = Movimiento.objects.filter(
-        tipo='COMPRA'
-    ).exclude(
-        id__in=PagoCompra.objects.values_list('compra_id', flat=True)
-    ).select_related('persona', 'tarjeta', 'establecimiento').order_by('fecha')
+    # Obtener todas las compras
+    compras = Movimiento.objects.filter(tipo='COMPRA').select_related('persona', 'tarjeta')
     
-    # 3. Obtener mensualidades
-    mensualidades = Movimiento.objects.filter(
-        tipo='MENSUALIDAD'
-    ).select_related('persona', 'tarjeta', 'establecimiento').order_by('fecha')
+    # Crear lista de IDs de compras pagadas
+    compras_pagadas_ids = set(PagoCompra.objects.values_list('compra_id', flat=True))
     
-    # 4. Construir la lista para el template
-    movimientos_lista = []
+    # Construir lista final
+    movimientos_final = []
     
-    # Agregar compras pendientes
-    for compra in compras_pendientes:
-        movimientos_lista.append({
-            'id': compra.id,
-            'fecha': compra.fecha,
-            'descripcion': compra.descripcion,
-            'cargo': compra.monto,
-            'abono': None,
-            'persona': compra.persona,
-            'tarjeta': compra.tarjeta,
-            'tipo': 'COMPRA',
-            'is_detalle': False,
-            'meses': f"{compra.meses_pagados}/{compra.numero_meses}" if compra.es_a_meses else None,
-            'monto_aplicado': None
-        })
-    
-    # Agregar mensualidades
-    for m in mensualidades:
-        pagado = m.pagos_recibidos.aggregate(total=Sum('monto_aplicado'))['total'] or 0
-        saldo = m.monto - pagado
-        if saldo > 0:
-            movimientos_lista.append({
-                'id': m.id,
-                'fecha': m.fecha,
-                'descripcion': m.descripcion,
-                'cargo': saldo,
+    # PRIMERO: Compras NO pagadas
+    for compra in compras:
+        if compra.id not in compras_pagadas_ids:
+            movimientos_final.append({
+                'id': compra.id,
+                'fecha': compra.fecha,
+                'descripcion': compra.descripcion,
+                'cargo': compra.monto,
                 'abono': None,
-                'persona': m.persona,
-                'tarjeta': m.tarjeta,
-                'tipo': 'MENSUALIDAD',
+                'persona': compra.persona,
+                'tarjeta': compra.tarjeta,
+                'tipo': 'COMPRA',
                 'is_detalle': False,
-                'meses': None,
                 'monto_aplicado': None
             })
     
-    # Agregar pagos y sus compras pagadas
+    # SEGUNDO: Pagos con sus compras
     for pago in pagos:
-        # El pago principal
-        movimientos_lista.append({
+        # Pago principal
+        movimientos_final.append({
             'id': pago.id,
             'fecha': pago.fecha,
             'descripcion': pago.descripcion,
@@ -387,88 +345,51 @@ def lista_movimientos(request):
             'tarjeta': pago.tarjeta,
             'tipo': 'PAGO',
             'is_detalle': False,
-            'meses': None,
-            'monto_aplicado': None
+            'monto_aplicado': None,
+            'grupo': pago.id
         })
         
-        # Compras pagadas por este pago
+        # Detalles de compras pagadas
         for pc in pago.pagos_a_compras.all():
-            movimientos_lista.append({
+            movimientos_final.append({
                 'id': pc.compra.id,
-                'fecha': None,  # Sin fecha para que se vea debajo
-                'descripcion': pc.compra.descripcion,
-                'cargo': pc.compra.monto,
+                'fecha': pago.fecha,  # Misma fecha del pago
+                'descripcion': f"↳ {pc.compra.descripcion} (Aplicado: ${pc.monto_aplicado:.2f})",
+                'cargo': pc.monto_aplicado,
                 'abono': None,
                 'persona': pc.compra.persona,
                 'tarjeta': pc.compra.tarjeta,
-                'tipo': 'COMPRA',
-                'is_detalle': True,  # ¡Esto es clave!
-                'meses': f"{pc.compra.meses_pagados}/{pc.compra.numero_meses}" if pc.compra.es_a_meses else None,
-                'monto_aplicado': pc.monto_aplicado
+                'tipo': 'COMPRA_PAGADA',
+                'is_detalle': True,
+                'monto_aplicado': pc.monto_aplicado,
+                'grupo': pago.id,
+                'suborden': 1
             })
     
-    # 5. Aplicar filtros
-    buscar = request.GET.get('buscar')
-    tipo = request.GET.get('tipo')
-    persona_id = request.GET.get('persona')
-    tarjeta_id = request.GET.get('tarjeta')
-    fecha_desde = request.GET.get('fecha_desde')
-    fecha_hasta = request.GET.get('fecha_hasta')
-    
-    # Filtrar
-    movimientos_filtrados = movimientos_lista.copy()
-    
-    if buscar:
-        movimientos_filtrados = [m for m in movimientos_filtrados if 
-                                buscar.lower() in m['descripcion'].lower() or
-                                (m['persona'] and buscar.lower() in m['persona'].nombre.lower())]
-    
-    if tipo and tipo != '':
-        movimientos_filtrados = [m for m in movimientos_filtrados if m['tipo'] == tipo]
-    
-    if persona_id and persona_id != '':
-        movimientos_filtrados = [m for m in movimientos_filtrados 
-                                if m['persona'] and str(m['persona'].id) == persona_id]
-    
-    if tarjeta_id and tarjeta_id != '':
-        movimientos_filtrados = [m for m in movimientos_filtrados 
-                                if m['tarjeta'] and str(m['tarjeta'].id) == tarjeta_id]
-    
-    if fecha_desde:
-        movimientos_filtrados = [m for m in movimientos_filtrados 
-                                if m['fecha'] and str(m['fecha']) >= fecha_desde]
-    
-    if fecha_hasta:
-        movimientos_filtrados = [m for m in movimientos_filtrados 
-                                if m['fecha'] and str(m['fecha']) <= fecha_hasta]
-    
-    # 6. Ordenar por fecha (los None van después de su pago)
-    movimientos_filtrados.sort(key=lambda x: (
-        str(x['fecha']) if x['fecha'] and not x.get('is_detalle', False) 
-        else str(x['fecha_original']) if x.get('fecha_original') 
-        else '9999-12-31',
-        0 if x['tipo'] == 'COMPRA' and not x.get('is_detalle', False) 
-        else 1 if x['tipo'] == 'PAGO' 
-        else 2
+    # ORDENAR: Por fecha, luego por grupo, luego por suborden
+    movimientos_final.sort(key=lambda x: (
+        str(x['fecha']),
+        x.get('grupo', x['id']),
+        x.get('suborden', 0)
     ))
     
-    # 7. Calcular totales
-    total_cargos = sum(m['cargo'] for m in movimientos_filtrados if m['cargo'] and not m.get('is_detalle', False))
-    total_abonos = sum(m['abono'] for m in movimientos_filtrados if m['abono'])
+    # Calcular totales
+    total_cargos = sum(m['cargo'] for m in movimientos_final if m['cargo'] and not m.get('is_detalle'))
+    total_abonos = sum(m['abono'] for m in movimientos_final if m['abono'])
     saldo = total_cargos - total_abonos
     
     personas = Persona.objects.filter(activo=True)
     tarjetas = Tarjeta.objects.filter(activa=True)
     
     return render(request, 'tarjetas_app/lista_movimientos.html', {
-        'movimientos': movimientos_filtrados,
+        'movimientos': movimientos_final,
         'personas': personas,
         'tarjetas': tarjetas,
         'total_cargos': total_cargos,
         'total_abonos': total_abonos,
         'saldo': saldo,
     })
-
+   
 # ========== EDITAR Y ELIMINAR ==========
 @login_required
 def editar_tarjeta(request, tarjeta_id):
@@ -670,11 +591,10 @@ def api_personas_tarjeta(request, tarjeta_id):
     return JsonResponse(response_data)
 
 # ========== DETALLE PERSONA ==========
+
 @login_required
 def detalle_persona(request, persona_id):
     from django.db.models import Sum, Prefetch
-    from itertools import chain
-    from operator import attrgetter
     from decimal import Decimal
     
     persona = get_object_or_404(Persona, id=persona_id)
@@ -683,36 +603,54 @@ def detalle_persona(request, persona_id):
     fecha_desde = request.GET.get('fecha_desde')
     fecha_hasta = request.GET.get('fecha_hasta')
     
-    # Construir lista agrupada para el template
-    movimientos_agrupados = []
+    # Obtener todas las compras de la persona
+    compras = Movimiento.objects.filter(
+        persona=persona,
+        tipo='COMPRA'
+    ).select_related('tarjeta', 'establecimiento').order_by('fecha')
     
-    # 1. Obtener PAGOS con sus compras relacionadas
-    pagos_query = Movimiento.objects.filter(
+    # Obtener todos los pagos de la persona con sus relaciones
+    pagos = Movimiento.objects.filter(
         persona=persona,
         tipo='PAGO'
     ).prefetch_related(
-        Prefetch(
-            'pagos_a_compras',
-            queryset=PagoCompra.objects.select_related(
-                'compra', 
-                'compra__tarjeta', 
-                'compra__establecimiento'
-            )
-        )
-    ).select_related('tarjeta', 'persona').order_by('fecha')
+        Prefetch('pagos_a_compras', queryset=PagoCompra.objects.select_related('compra'))
+    ).select_related('tarjeta').order_by('fecha')
     
+    # Aplicar filtros
     if tarjeta_id:
-        pagos_query = pagos_query.filter(tarjeta_id=tarjeta_id)
+        compras = compras.filter(tarjeta_id=tarjeta_id)
+        pagos = pagos.filter(tarjeta_id=tarjeta_id)
     if fecha_desde:
-        pagos_query = pagos_query.filter(fecha__gte=fecha_desde)
+        compras = compras.filter(fecha__gte=fecha_desde)
+        pagos = pagos.filter(fecha__gte=fecha_desde)
     if fecha_hasta:
-        pagos_query = pagos_query.filter(fecha__lte=fecha_hasta)
+        compras = compras.filter(fecha__lte=fecha_hasta)
+        pagos = pagos.filter(fecha__lte=fecha_hasta)
     
-    for pago in pagos_query:
-        # Calcular total aplicado por este pago
-        total_aplicado = pago.pagos_a_compras.aggregate(total=Sum('monto_aplicado'))['total'] or 0
-        
-        # Crear item del pago principal
+    # Construir lista de movimientos
+    movimientos = []
+    
+    # PRIMERO: Agregar compras con saldo pendiente
+    for compra in compras:
+        total_pagado = compra.pagos_recibidos.aggregate(total=Sum('monto_aplicado'))['total'] or 0
+        saldo = compra.monto - total_pagado
+        if saldo > 0:  # Solo mostrar si tiene saldo pendiente
+            movimientos.append({
+                'tipo': 'COMPRA',
+                'id': compra.id,
+                'fecha': compra.fecha,
+                'descripcion': compra.descripcion,
+                'monto': compra.monto,
+                'saldo': saldo,
+                'tarjeta': compra.tarjeta,
+                'establecimiento': compra.establecimiento.nombre if compra.establecimiento else '',
+                'cashback': compra.monto_cashback,
+            })
+    
+    # SEGUNDO: Agregar pagos con sus compras pagadas
+    for pago in pagos:
+        # Pago principal
         item_pago = {
             'tipo': 'PAGO',
             'id': pago.id,
@@ -720,17 +658,16 @@ def detalle_persona(request, persona_id):
             'descripcion': pago.descripcion,
             'monto': pago.monto,
             'tarjeta': pago.tarjeta,
-            'total_aplicado': total_aplicado,
             'detalles': []
         }
         
-        # Agregar compras pagadas como detalles
+        # Compras pagadas por este pago
         for pc in pago.pagos_a_compras.all():
             item_pago['detalles'].append({
                 'tipo': 'COMPRA_PAGADA',
                 'id': pc.compra.id,
                 'descripcion': pc.compra.descripcion,
-                'monto': pc.compra.monto,
+                'monto': pc.monto_aplicado,
                 'monto_aplicado': pc.monto_aplicado,
                 'tarjeta': pc.compra.tarjeta,
                 'establecimiento': pc.compra.establecimiento.nombre if pc.compra.establecimiento else '',
@@ -738,69 +675,12 @@ def detalle_persona(request, persona_id):
                 'fecha': pc.compra.fecha,
             })
         
-        movimientos_agrupados.append(item_pago)
-    
-    # 2. Obtener COMPRAS PENDIENTES (no pagadas)
-    compras_pendientes_query = Movimiento.objects.filter(
-        persona=persona,
-        tipo='COMPRA'
-    ).exclude(
-        id__in=PagoCompra.objects.values_list('compra_id', flat=True)
-    ).select_related('tarjeta', 'persona', 'establecimiento').order_by('fecha')
-    
-    if tarjeta_id:
-        compras_pendientes_query = compras_pendientes_query.filter(tarjeta_id=tarjeta_id)
-    if fecha_desde:
-        compras_pendientes_query = compras_pendientes_query.filter(fecha__gte=fecha_desde)
-    if fecha_hasta:
-        compras_pendientes_query = compras_pendientes_query.filter(fecha__lte=fecha_hasta)
-    
-    for compra in compras_pendientes_query:
-        # Calcular saldo pendiente
-        pagado = compra.pagos_recibidos.aggregate(total=Sum('monto_aplicado'))['total'] or 0
-        saldo = compra.monto - pagado
-        
-        movimientos_agrupados.append({
-            'tipo': 'COMPRA_PENDIENTE',
-            'id': compra.id,
-            'fecha': compra.fecha,
-            'descripcion': compra.descripcion,
-            'monto': compra.monto,
-            'saldo_pendiente': saldo,
-            'tarjeta': compra.tarjeta,
-            'establecimiento': compra.establecimiento.nombre if compra.establecimiento else '',
-            'cashback': compra.monto_cashback,
-        })
-    
-    # 3. Obtener MENSUALIDADES
-    mensualidades_query = Movimiento.objects.filter(
-        persona=persona,
-        tipo='MENSUALIDAD'
-    ).select_related('tarjeta', 'persona', 'establecimiento').order_by('fecha')
-    
-    if tarjeta_id:
-        mensualidades_query = mensualidades_query.filter(tarjeta_id=tarjeta_id)
-    if fecha_desde:
-        mensualidades_query = mensualidades_query.filter(fecha__gte=fecha_desde)
-    if fecha_hasta:
-        mensualidades_query = mensualidades_query.filter(fecha__lte=fecha_hasta)
-    
-    for mensualidad in mensualidades_query:
-        movimientos_agrupados.append({
-            'tipo': 'MENSUALIDAD',
-            'id': mensualidad.id,
-            'fecha': mensualidad.fecha,
-            'descripcion': mensualidad.descripcion,
-            'monto': mensualidad.monto,
-            'tarjeta': mensualidad.tarjeta,
-            'establecimiento': mensualidad.establecimiento.nombre if mensualidad.establecimiento else '',
-            'cashback': mensualidad.monto_cashback,
-        })
+        movimientos.append(item_pago)
     
     # Ordenar por fecha
-    movimientos_agrupados.sort(key=lambda x: (x['fecha']))
+    movimientos.sort(key=lambda x: x['fecha'])
     
-    # Obtener compras a meses para la sección de mensualidades
+    # Obtener compras a meses
     compras_meses = Movimiento.objects.filter(
         persona=persona,
         tipo='COMPRA',
@@ -819,7 +699,7 @@ def detalle_persona(request, persona_id):
         'persona': persona,
         'tarjetas': tarjetas,
         'tarjeta_seleccionada': tarjeta_seleccionada,
-        'movimientos_agrupados': movimientos_agrupados,
+        'movimientos_agrupados': movimientos,
         'compras_meses': compras_meses,
     }
     return render(request, 'tarjetas_app/detalle_persona.html', context)

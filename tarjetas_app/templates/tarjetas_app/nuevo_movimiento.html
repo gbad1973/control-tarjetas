@@ -109,9 +109,6 @@
         <div class="form-container">
             <form method="post" id="movimientoForm">
                 {% csrf_token %}
-
-                <!-- CAMPO OCULTO PARA COMPRA_RELACIONADA (REQUERIDO POR EL FORMULARIO) -->
-                <input type="hidden" name="compra_relacionada" id="id_compra_relacionada" value="">
                 
                 <div class="form-grid">
                     <!-- Tarjeta -->
@@ -246,9 +243,6 @@
         const montoInput = document.getElementById('id_monto');
         const montoMensualSpan = document.getElementById('monto-mensual');
 
-        // Elemento oculto para compra_relacionada
-        const compraRelacionadaInput = document.getElementById('id_compra_relacionada');
-
         // Función para calcular monto mensual
         function calcularMontoMensual() {
             const monto = parseFloat(montoInput.value) || 0;
@@ -364,7 +358,7 @@
                 establecimientoInfo.style.color = '#6b7280';
                 
                 pagosDistribucion.style.display = 'block';
-                mesesOpciones.style.display = 'none'; // OCULTAR opciones de meses
+                mesesOpciones.style.display = 'none';
                 
                 if (personaSelect.value) {
                     cargarComprasEnSelects(personaSelect.value);
@@ -383,7 +377,7 @@
                 establecimientoInfo.style.color = '#6b7280';
                 
                 pagosDistribucion.style.display = 'none';
-                mesesOpciones.style.display = 'none'; // OCULTAR opciones de meses
+                mesesOpciones.style.display = 'none';
             }
         }
 
@@ -409,6 +403,12 @@
                     }
                 });
                 
+                // Limpiar checkbox DELETE
+                const deleteCheckbox = newRow.querySelector('input[type="checkbox"][name$="-DELETE"]');
+                if (deleteCheckbox) {
+                    deleteCheckbox.checked = false;
+                }
+                
                 pagosTbody.appendChild(newRow);
                 formNum++;
                 totalForms.value = formNum;
@@ -421,10 +421,6 @@
                 if (nuevoSelect) {
                     nuevoSelect.addEventListener('change', function() {
                         actualizarMontoPorSelect(this);
-                        // ACTUALIZAR CAMPO OCULTO CUANDO CAMBIA LA SELECCIÓN
-                        if (compraRelacionadaInput) {
-                            compraRelacionadaInput.value = this.value;
-                        }
                     });
                 }
             });
@@ -435,10 +431,6 @@
             document.querySelectorAll('[id$="-compra"]').forEach(select => {
                 select.addEventListener('change', function() {
                     actualizarMontoPorSelect(this);
-                    // ACTUALIZAR CAMPO OCULTO CUANDO CAMBIA LA SELECCIÓN
-                    if (compraRelacionadaInput) {
-                        compraRelacionadaInput.value = this.value;
-                    }
                 });
             });
         }
@@ -470,7 +462,6 @@
                 return false;
             }
             
-            // Validación para compras a meses
             if (tipo === 'COMPRA' && esAMesesCheckbox && esAMesesCheckbox.checked) {
                 if (!numeroMesesSelect.value) {
                     e.preventDefault();
@@ -483,11 +474,13 @@
             if (tipo === 'PAGO') {
                 const filas = document.querySelectorAll('.pago-fila');
                 let algunaValida = false;
-                let primerIdValido = null;
                 
                 for (let fila of filas) {
                     const compraSelect = fila.querySelector('select');
                     const montoInput = fila.querySelector('input[type="number"]');
+                    const deleteCheckbox = fila.querySelector('input[type="checkbox"][name$="-DELETE"]');
+                    
+                    if (deleteCheckbox && deleteCheckbox.checked) continue;
                     
                     if (compraSelect && compraSelect.value && montoInput && montoInput.value && parseFloat(montoInput.value) > 0) {
                         const saldo = compraSelect.options[compraSelect.selectedIndex]?.getAttribute('data-saldo');
@@ -498,9 +491,6 @@
                             return false;
                         }
                         algunaValida = true;
-                        if (!primerIdValido) {
-                            primerIdValido = compraSelect.value;
-                        }
                     }
                 }
                 
@@ -508,11 +498,6 @@
                     e.preventDefault();
                     alert('⚠️ Debes agregar al menos una compra con monto válido para el pago');
                     return false;
-                }
-                
-                // ASEGURAR QUE EL CAMPO OCULTO TENGA UN VALOR
-                if (primerIdValido && compraRelacionadaInput) {
-                    compraRelacionadaInput.value = primerIdValido;
                 }
             }
             

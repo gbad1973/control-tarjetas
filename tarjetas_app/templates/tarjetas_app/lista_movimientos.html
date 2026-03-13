@@ -437,15 +437,16 @@
                     {% for m in movimientos %}
                     <tr class="
                         {% if m.tipo == 'PAGO' %}fila-pago{% endif %}
-                        {% if m.tipo == 'COMPRA' and not m.is_detalle and not m.es_pagada %}fila-compra-pendiente{% endif %}
-                        {% if m.tipo == 'COMPRA' and m.is_detalle %}fila-compra-detalle{% endif %}
+                        {% if m.tipo == 'COMPRA' %}fila-compra-pendiente{% endif %}
+                        {% if m.tipo == 'COMPRA_PAGADA' %}fila-compra-detalle{% endif %}
                     ">
-                        <td>{% if m.fecha %}{{ m.fecha|date:"d/m/Y" }}{% endif %}</td>
+                        
+                        <td>{% if m.fecha and not m.is_detalle %}{{ m.fecha|date:"d/m/Y" }}{% endif %}</td>
                         <td class="{% if m.is_detalle %}descripcion-cell{% endif %}">
                             <span class="icono-movimiento">
                                 {% if m.tipo == 'PAGO' %}💰
-                                {% elif m.tipo == 'COMPRA' and not m.is_detalle %}🛒
-                                {% elif m.tipo == 'COMPRA' and m.is_detalle %}↳
+                                {% elif m.tipo == 'COMPRA' %}🛒
+                                {% elif m.tipo == 'COMPRA_PAGADA' %}↳
                                 {% endif %}
                             </span>
                             {{ m.descripcion }}
@@ -458,12 +459,12 @@
                         <td>
                             <span class="tipo-badge 
                                 {% if m.tipo == 'PAGO' %}tipo-pago
-                                {% elif m.tipo == 'COMPRA' and m.is_detalle %}tipo-pagada
-                                {% else %}tipo-compra
+                                {% elif m.tipo == 'COMPRA' %}tipo-compra
+                                {% elif m.tipo == 'COMPRA_PAGADA' %}tipo-pagada
                                 {% endif %}">
                                 {% if m.tipo == 'PAGO' %}PAGO
-                                {% elif m.tipo == 'COMPRA' and m.is_detalle %}COMPRA PAGADA
-                                {% else %}COMPRA
+                                {% elif m.tipo == 'COMPRA' %}COMPRA PENDIENTE
+                                {% elif m.tipo == 'COMPRA_PAGADA' %}COMPRA PAGADA
                                 {% endif %}
                             </span>
                         </td>
@@ -517,4 +518,16 @@
         });
     </script>
 </body>
+
+<!-- DEBUG: Ver datos que llegan -->
+<div style="background:black; color:lime; padding:20px; margin:20px; font-family:monospace;">
+<h3>🔍 DEBUG - DATOS QUE LLEGAN AL TEMPLATE:</h3>
+<pre>
+{% for m in movimientos|slice:":10" %}
+ID: {{ m.id }} | Fecha: '{{ m.fecha }}' | Tipo: {{ m.tipo }} | is_detalle: {{ m.is_detalle }} | Desc: {{ m.descripcion|truncatechars:30 }}
+{% endfor %}
+</pre>
+</div>
+
+
 </html>
