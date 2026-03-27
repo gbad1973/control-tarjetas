@@ -3,6 +3,8 @@ from django.contrib import admin
 from django.urls import path
 from tarjetas_app import views
 from tarjetas_app.views_api import api_personas_tarjeta
+from tarjetas_app.views import exportar_excel_movimientos
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -51,4 +53,11 @@ urlpatterns = [
     path('reportes/cashback/', views.reporte_cashback_general, name='reporte_cashback_general'),
     path('reportes/deudas/', views.reporte_deudas, name='reporte_deudas'),
     path('tarjeta/<int:tarjeta_id>/movimientos/', views.movimientos_tarjeta, name='movimientos_tarjeta'),
+    
+    
+    # ESTO ES PARA EXPORTAR A EXCEL
+    
+    path('exportar/excel/', exportar_excel_movimientos, name='exportar_excel'),
+    path('exportar/excel/persona/<int:persona_id>/', exportar_excel_movimientos, name='exportar_excel_persona'),
+    
 ]

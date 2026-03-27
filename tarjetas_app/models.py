@@ -145,10 +145,10 @@ class Movimiento(models.Model):
         ('CASHBACK', 'Cashback'),
     ]
        
-    tarjeta = models.ForeignKey(Tarjeta, on_delete=models.CASCADE, related_name='movimientos', verbose_name="Tarjeta")
-    persona = models.ForeignKey(Persona, on_delete=models.CASCADE, related_name='movimientos', verbose_name="Persona")
+    tarjeta = models.ForeignKey(Tarjeta, on_delete=models.CASCADE, related_name='movimientos', verbose_name="Tarjeta", db_index=True)
+    persona = models.ForeignKey(Persona, on_delete=models.CASCADE, related_name='movimientos', verbose_name="Persona", db_index=True)
     establecimiento = models.ForeignKey(Establecimiento, on_delete=models.CASCADE, verbose_name="Establecimiento", null=True, blank=True)
-    tipo = models.CharField(max_length=15, choices=TIPO_CHOICES, verbose_name="Tipo de movimiento")
+    tipo = models.CharField(max_length=15, choices=TIPO_CHOICES, verbose_name="Tipo de movimiento", db_index=True)
     monto = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto")
     monto_cashback = models.DecimalField(
         max_digits=10, 
@@ -157,7 +157,7 @@ class Movimiento(models.Model):
         verbose_name="Cashback generado"
     )
     descripcion = models.TextField(verbose_name="Descripción")
-    fecha = models.DateField(verbose_name="Fecha del movimiento")
+    fecha = models.DateField(verbose_name="Fecha del movimiento", db_index=True)
     fecha_registro = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de registro")
     es_a_meses = models.BooleanField(default=False, verbose_name="Compra a meses")
     numero_meses = models.IntegerField(null=True, blank=True, verbose_name="Número de meses")
@@ -168,6 +168,12 @@ class Movimiento(models.Model):
         verbose_name = "Movimiento"
         verbose_name_plural = "Movimientos"
         ordering = ['-fecha', '-fecha_registro']
+        indexes = [
+            models.Index(fields=['fecha']),
+            models.Index(fields=['tipo']),
+            models.Index(fields=['persona']),
+            models.Index(fields=['tarjeta']),
+        ]
     
     def __str__(self):
         return f"{self.get_tipo_display()} - ${self.monto} - {self.persona.nombre}"
@@ -208,7 +214,6 @@ class Movimiento(models.Model):
             return 0
         total_pagado = self.pagos_recibidos.aggregate(total=models.Sum('monto_aplicado'))['total'] or 0
         return self.monto - total_pagado
-
 
 class LiberacionMensualidad(models.Model):
     """Registro de cada mensualidad cargada"""

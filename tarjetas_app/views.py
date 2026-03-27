@@ -14,6 +14,9 @@ from operator import attrgetter
 from decimal import Decimal
 
 
+import csv
+from django.http import HttpResponse
+
 # ========== AUTENTICACIÓN ==========
 def login_view(request):
     if request.method == 'POST':
@@ -310,15 +313,18 @@ def lista_movimientos(request):
     # Obtener todas las compras
     compras = Movimiento.objects.filter(tipo='COMPRA').select_related('persona', 'tarjeta')
     
+    # Obtener todas las mensualidades
+    mensualidades = Movimiento.objects.filter(tipo='MENSUALIDAD').select_related('persona', 'tarjeta', 'establecimiento')
+    
     # Crear lista de IDs de compras pagadas
     compras_pagadas_ids = set(PagoCompra.objects.values_list('compra_id', flat=True))
     
     # Construir lista final
     movimientos_final = []
     
-    # PRIMERO: Compras NO pagadas
+    # PRIMERO: Compras NO pagadas (excluyendo compras a meses)
     for compra in compras:
-        if compra.id not in compras_pagadas_ids:
+        if compra.id not in compras_pagadas_ids and not compra.es_a_meses:
             movimientos_final.append({
                 'id': compra.id,
                 'fecha': compra.fecha,
@@ -332,7 +338,25 @@ def lista_movimientos(request):
                 'monto_aplicado': None
             })
     
-    # SEGUNDO: Pagos con sus compras
+    # SEGUNDO: Mensualidades
+    for m in mensualidades:
+        pagado = m.pagos_recibidos.aggregate(total=Sum('monto_aplicado'))['total'] or 0
+        saldo = m.monto - pagado
+        if saldo > 0:
+            movimientos_final.append({
+                'id': m.id,
+                'fecha': m.fecha,
+                'descripcion': m.descripcion,
+                'cargo': saldo,
+                'abono': None,
+                'persona': m.persona,
+                'tarjeta': m.tarjeta,
+                'tipo': 'MENSUALIDAD',
+                'is_detalle': False,
+                'monto_aplicado': None
+            })
+    
+    # TERCERO: Pagos con sus compras
     for pago in pagos:
         # Pago principal
         movimientos_final.append({
@@ -590,7 +614,7 @@ def api_personas_tarjeta(request, tarjeta_id):
     
     return JsonResponse(response_data)
 
-# ========== DETALLE PERSONA ==========
+# ========== DETALLE PERSONA (CORREGIDO CON MENSUALIDADES) ==========
 
 @login_required
 def detalle_persona(request, persona_id):
@@ -603,10 +627,17 @@ def detalle_persona(request, persona_id):
     fecha_desde = request.GET.get('fecha_desde')
     fecha_hasta = request.GET.get('fecha_hasta')
     
-    # Obtener todas las compras de la persona
+    # Obtener todas las compras de la persona (excluyendo compras a meses)
     compras = Movimiento.objects.filter(
         persona=persona,
-        tipo='COMPRA'
+        tipo='COMPRA',
+        es_a_meses=False
+    ).select_related('tarjeta', 'establecimiento').order_by('fecha')
+    
+    # Obtener todas las mensualidades de la persona
+    mensualidades = Movimiento.objects.filter(
+        persona=persona,
+        tipo='MENSUALIDAD'
     ).select_related('tarjeta', 'establecimiento').order_by('fecha')
     
     # Obtener todos los pagos de la persona con sus relaciones
@@ -620,12 +651,15 @@ def detalle_persona(request, persona_id):
     # Aplicar filtros
     if tarjeta_id:
         compras = compras.filter(tarjeta_id=tarjeta_id)
+        mensualidades = mensualidades.filter(tarjeta_id=tarjeta_id)
         pagos = pagos.filter(tarjeta_id=tarjeta_id)
     if fecha_desde:
         compras = compras.filter(fecha__gte=fecha_desde)
+        mensualidades = mensualidades.filter(fecha__gte=fecha_desde)
         pagos = pagos.filter(fecha__gte=fecha_desde)
     if fecha_hasta:
         compras = compras.filter(fecha__lte=fecha_hasta)
+        mensualidades = mensualidades.filter(fecha__lte=fecha_hasta)
         pagos = pagos.filter(fecha__lte=fecha_hasta)
     
     # Construir lista de movimientos
@@ -635,9 +669,9 @@ def detalle_persona(request, persona_id):
     for compra in compras:
         total_pagado = compra.pagos_recibidos.aggregate(total=Sum('monto_aplicado'))['total'] or 0
         saldo = compra.monto - total_pagado
-        if saldo > 0:  # Solo mostrar si tiene saldo pendiente
+        if saldo > 0:
             movimientos.append({
-                'tipo': 'COMPRA',
+                'tipo': 'COMPRA_PENDIENTE',  # ← CORREGIDO
                 'id': compra.id,
                 'fecha': compra.fecha,
                 'descripcion': compra.descripcion,
@@ -648,7 +682,24 @@ def detalle_persona(request, persona_id):
                 'cashback': compra.monto_cashback,
             })
     
-    # SEGUNDO: Agregar pagos con sus compras pagadas
+    # SEGUNDO: Agregar mensualidades con saldo pendiente
+    for m in mensualidades:
+        pagado = m.pagos_recibidos.aggregate(total=Sum('monto_aplicado'))['total'] or 0
+        saldo = m.monto - pagado
+        if saldo > 0:
+            movimientos.append({
+                'tipo': 'MENSUALIDAD',
+                'id': m.id,
+                'fecha': m.fecha,
+                'descripcion': m.descripcion,
+                'monto': m.monto,
+                'saldo': saldo,
+                'tarjeta': m.tarjeta,
+                'establecimiento': m.establecimiento.nombre if m.establecimiento else '',
+                'cashback': m.monto_cashback,
+            })
+    
+    # TERCERO: Agregar pagos con sus compras pagadas
     for pago in pagos:
         # Pago principal
         item_pago = {
@@ -678,9 +729,10 @@ def detalle_persona(request, persona_id):
         movimientos.append(item_pago)
     
     # Ordenar por fecha
+    #movimientos.sort(key=lambda x: x['fecha'])
     movimientos.sort(key=lambda x: x['fecha'])
     
-    # Obtener compras a meses
+    # Obtener compras a meses (para el botón de cargar mensualidades)
     compras_meses = Movimiento.objects.filter(
         persona=persona,
         tipo='COMPRA',
@@ -899,6 +951,49 @@ def cargar_mensualidad(request, compra_id):
         )
         
         return redirect('detalle_persona', persona_id=compra.persona.id)
+
+
+
+
+# ==========. ESTO ES PARA EXPORTAR A  EXCEL. ======================
+
+
+
+def exportar_excel_movimientos(request, persona_id=None):
+    """Exporta movimientos a Excel (formato CSV)"""
+    if persona_id:
+        persona = get_object_or_404(Persona, id=persona_id)
+        movimientos = Movimiento.objects.filter(persona=persona).order_by('-fecha')
+        nombre_archivo = f"movimientos_{persona.nombre.replace(' ', '_')}.csv"
+    else:
+        movimientos = Movimiento.objects.all().order_by('-fecha')
+        nombre_archivo = "movimientos_todos.csv"
+    
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
+    
+    writer = csv.writer(response)
+    
+    # Cabeceras
+    writer.writerow(['ID', 'Fecha', 'Tipo', 'Descripción', 'Monto', 'Cashback', 'Persona', 'Tarjeta', 'Establecimiento'])
+    
+    # Datos
+    for m in movimientos:
+        writer.writerow([
+            m.id,
+            m.fecha.strftime('%d/%m/%Y'),
+            m.get_tipo_display(),
+            m.descripcion,
+            f"{m.monto:.2f}",
+            f"{m.monto_cashback:.2f}" if m.monto_cashback else '0.00',
+            m.persona.nombre,
+            f"{m.tarjeta.banco} - ****{m.tarjeta.numero[-4:]}",
+            m.establecimiento.nombre if m.establecimiento else ''
+        ])
+    
+    return response
+
+
 
 # ========== REPORTES ==========
 @login_required 

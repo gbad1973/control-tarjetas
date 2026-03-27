@@ -117,6 +117,21 @@
             display: inline-block;
         }
         
+        /* Nuevo estilo para botón Excel */
+        .btn-excel {
+            background: linear-gradient(to right, #10b981, #34d399);
+            color: white;
+            padding: 8px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
         .movimientos-table {
             background: white;
             border-radius: 0 0 20px 20px;
@@ -161,6 +176,13 @@
             border-left: 4px solid #d97706;
         }
         
+        /* ESTILOS PARA mensualidad  PENDIENTES */
+        .fila-mensualidad {
+            background-color: #fff3cd !important;
+            border-left: 4px solid #d97706;
+        }
+
+
         /* ESTILOS PARA COMPRAS QUE SERÁN PAGADAS (DETALLE) */
         .fila-compra-detalle {
             background-color: #f3f4f6 !important;
@@ -411,6 +433,10 @@
                     <div class="filtro-acciones">
                         <button type="submit" class="btn-filtrar">🔍 Buscar</button>
                         <a href="{% url 'lista_movimientos' %}" class="btn-limpiar">🧹 Limpiar</a>
+                        <!-- BOTÓN DE EXCEL AGREGADO -->
+                        <button type="button" onclick="exportarExcel()" class="btn-excel">
+                            📊 Excel
+                        </button>
                     </div>
                 </div>
             </form>
@@ -438,6 +464,7 @@
                     <tr class="
                         {% if m.tipo == 'PAGO' %}fila-pago{% endif %}
                         {% if m.tipo == 'COMPRA' %}fila-compra-pendiente{% endif %}
+                        {% if m.tipo == 'MENSUALIDAD' %}fila-mensualidad{% endif %}
                         {% if m.tipo == 'COMPRA_PAGADA' %}fila-compra-detalle{% endif %}
                     ">
                         
@@ -516,18 +543,11 @@
         document.getElementById('buscar').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') document.getElementById('filtrosForm').submit();
         });
+        
+        // Función para exportar a Excel
+        function exportarExcel() {
+            window.location.href = "{% url 'exportar_excel' %}";
+        }
     </script>
 </body>
-
-<!-- DEBUG: Ver datos que llegan -->
-<div style="background:black; color:lime; padding:20px; margin:20px; font-family:monospace;">
-<h3>🔍 DEBUG - DATOS QUE LLEGAN AL TEMPLATE:</h3>
-<pre>
-{% for m in movimientos|slice:":10" %}
-ID: {{ m.id }} | Fecha: '{{ m.fecha }}' | Tipo: {{ m.tipo }} | is_detalle: {{ m.is_detalle }} | Desc: {{ m.descripcion|truncatechars:30 }}
-{% endfor %}
-</pre>
-</div>
-
-
 </html>

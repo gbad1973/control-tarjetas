@@ -77,8 +77,8 @@
         }
         
         .fila-mensualidad {
-            background-color: #dbeafe !important;
-            border-left: 4px solid #2563eb;
+            background-color: #fff3cd !important;
+            border-left: 4px solid #d97706;
         }
         
         .fila-detalle-compra {
@@ -414,7 +414,8 @@
                                 </td>
                                 <td>{{ item.tarjeta.banco }} - ****{{ item.tarjeta.numero|slice:"-4:" }}</td>
                                 <td>{{ item.establecimiento|default:"-" }}</td>
-                                <td class="text-right monto-cargo">${{ item.saldo_pendiente|floatformat:2|intcomma }}</td>
+                                 <!--  <td class="text-right monto-cargo">${{ item.saldo_pendiente|floatformat:2|intcomma }}</td> -->
+                                <td class="text-right monto-cargo">${{ item.saldo|floatformat:2|intcomma }}</td>
                                 <td class="text-right">-</td>
                                 <td class="text-right">
                                     {% if item.cashback > 0 %}
@@ -540,7 +541,7 @@
             calcularTotales();
             
             window.exportarExcel = function() {
-                alert('Función de exportación a Excel - Implementar según necesidad');
+                window.location.href = "{% url 'exportar_excel_persona' persona.id %}";
             };
             
             window.exportarPDF = function() {
