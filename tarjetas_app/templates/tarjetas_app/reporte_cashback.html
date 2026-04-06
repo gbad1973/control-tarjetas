@@ -1,0 +1,199 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte de Cashback - Control de Tarjetas</title>
+    {% load humanize %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); padding: 25px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        .header h1 { color: #1f2937; font-size: 1.5rem; font-weight: 600; }
+        .btn { padding: 8px 16px; border: none; border-radius: 8px; font-weight: 500; font-size: 0.85rem; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s ease; }
+        .btn-primary { background: linear-gradient(to right, #4f46e5, #7c3aed); color: white; }
+        .btn-secondary { background: #f3f4f6; color: #6b7280; }
+        
+        /* Tabla */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th { background: #1e40af; color: white; padding: 12px; text-align: left; }
+        td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; }
+        .text-right { text-align: right; }
+        .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        
+        /* Gráfica */
+        .chart-container {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+        }
+        .chart-container h3 {
+            color: #1f2937;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+        canvas {
+            max-height: 400px;
+        }
+        
+        /* Total general */
+        .total-card {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+            text-align: center;
+        }
+        .total-card .label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        .total-card .value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+        
+        @media (max-width: 768px) {
+            table { font-size: 0.75rem; }
+            th, td { padding: 8px; }
+            .total-card .value { font-size: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💰 Reporte de Cashback por Porcentaje</h1>
+            <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                ← Volver al Dashboard
+            </a>
+        </div>
+
+        <!-- Tabla resumen por porcentaje -->
+        <table>
+            <thead>
+                <tr>
+                    <th>Porcentaje</th>
+                    <th class="text-right">Monto Total de Compras</th>
+                    <th class="text-right">Cashback Generado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in reporte_porcentaje_ordenado %}
+                <tr>
+                    <td><span class="badge badge-success">{{ item.porcentaje }}%</span></td>
+                    <td class="text-right">${{ item.monto_total|floatformat:2|intcomma }}</td>
+                    <td class="text-right">${{ item.cashback|floatformat:2|intcomma }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3" style="text-align: center;">No hay datos de cashback</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot style="background: #f3f4f6; font-weight: bold;">
+                <tr>
+                    <th>TOTAL</th>
+                    <th class="text-right">${{ total_monto|floatformat:2|intcomma }}</th>
+                    <th class="text-right">${{ total_cashback|floatformat:2|intcomma }}</th>
+                </tr>
+            </tfoot>
+        </table>
+
+        <!-- Tarjeta de total -->
+        <div class="total-card">
+            <div class="label">💰 Cashback Total Generado</div>
+            <div class="value">${{ total_cashback|floatformat:2|intcomma }}</div>
+        </div>
+
+        <!-- Gráfica de barras -->
+        <div class="chart-container">
+            <h3>📊 Cashback por Porcentaje</h3>
+            <canvas id="cashbackChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Datos para la gráfica
+        const porcentajes = [
+            {% for item in reporte_porcentaje_ordenado %}
+                "{{ item.porcentaje }}%",
+            {% endfor %}
+        ];
+        
+        const cashbacks = [
+            {% for item in reporte_porcentaje_ordenado %}
+                {{ item.cashback }},
+            {% endfor %}
+        ];
+        
+        // Colores para las barras
+        const colores = [
+            '#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#d1fae5',
+            '#059669', '#047857', '#065f46', '#064e3b', '#022c22'
+        ];
+        
+        // Crear gráfica
+        const ctx = document.getElementById('cashbackChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: porcentajes,
+                datasets: [{
+                    label: 'Cashback Generado ($)',
+                    data: cashbacks,
+                    backgroundColor: colores.slice(0, porcentajes.length),
+                    borderColor: '#059669',
+                    borderWidth: 1,
+                    borderRadius: 8,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return 'Cashback: $' + context.raw.toLocaleString('es-MX', {minimumFractionDigits: 2});
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Cashback ($)',
+                            font: { weight: 'bold' }
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value.toLocaleString('es-MX');
+                            }
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Porcentaje de Cashback',
+                            font: { weight: 'bold' }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

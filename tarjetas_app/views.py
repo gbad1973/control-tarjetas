@@ -996,6 +996,73 @@ def exportar_excel_movimientos(request, persona_id=None):
 
 
 # ========== REPORTES ==========
+@login_required
+def reporte_cashback(request):
+    """Reporte de cashback agrupado por porcentaje (ordenado de mayor a menor)"""
+    from django.db.models import Sum
+    
+    # Reporte por porcentaje
+    reporte_porcentaje = {}
+    
+    # Compras normales (NO a meses)
+    compras = Movimiento.objects.filter(
+        tipo='COMPRA',
+        es_a_meses=False,
+        establecimiento__isnull=False,
+        establecimiento__porcentaje_cashback__gt=0
+    ).select_related('establecimiento')
+    
+    for c in compras:
+        pct = c.establecimiento.porcentaje_cashback
+        if pct not in reporte_porcentaje:
+            reporte_porcentaje[pct] = {
+                'monto_total': 0,
+                'cashback': 0,
+            }
+        reporte_porcentaje[pct]['monto_total'] += c.monto
+        reporte_porcentaje[pct]['cashback'] += c.monto_cashback
+    
+    # Mensualidades
+    mensualidades = Movimiento.objects.filter(
+        tipo='MENSUALIDAD',
+        establecimiento__isnull=False,
+        establecimiento__porcentaje_cashback__gt=0
+    ).select_related('establecimiento')
+    
+    for m in mensualidades:
+        pct = m.establecimiento.porcentaje_cashback
+        if pct not in reporte_porcentaje:
+            reporte_porcentaje[pct] = {
+                'monto_total': 0,
+                'cashback': 0,
+            }
+        reporte_porcentaje[pct]['monto_total'] += m.monto
+        reporte_porcentaje[pct]['cashback'] += m.monto_cashback
+    
+    # Ordenar de mayor a menor porcentaje
+    reporte_porcentaje_ordenado = []
+    for pct in sorted(reporte_porcentaje.keys(), reverse=True):
+        data = reporte_porcentaje[pct]
+        reporte_porcentaje_ordenado.append({
+            'porcentaje': pct,
+            'monto_total': data['monto_total'],
+            'cashback': data['cashback'],
+        })
+    
+    # Totales generales
+    total_monto = sum(d['monto_total'] for d in reporte_porcentaje_ordenado)
+    total_cashback = sum(d['cashback'] for d in reporte_porcentaje_ordenado)
+    
+    context = {
+        'reporte_porcentaje_ordenado': reporte_porcentaje_ordenado,
+        'total_monto': total_monto,
+        'total_cashback': total_cashback,
+    }
+    return render(request, 'tarjetas_app/reporte_cashback.html', context)
+
+
+
+
 @login_required 
 def reporte_cashback_persona(request, persona_id):
     return redirect('dashboard')

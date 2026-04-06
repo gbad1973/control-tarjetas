@@ -185,11 +185,23 @@ class Movimiento(models.Model):
         return 0
     
     # ===== MÉTODO SAVE CORREGIDO - ELIMINADA LA CREACIÓN AUTOMÁTICA =====
-    def save(self, *args, **kwargs):
-        """Guarda el movimiento sin crear mensualidades automáticas"""
-        super().save(*args, **kwargs)
+    #def save(self, *args, **kwargs):
+    #    """Guarda el movimiento sin crear mensualidades automáticas"""
+    #    super().save(*args, **kwargs)
         
         # Actualizar saldo de la tarjeta después de guardar
+    #    if hasattr(self, 'tarjeta') and self.tarjeta:
+    #        self.tarjeta.actualizar_saldo()
+    
+    
+    def save(self, *args, **kwargs):
+        # Calcular cashback SOLO para compras NORMALES (NO a meses)
+        if self.tipo == 'COMPRA' and self.establecimiento and not self.es_a_meses:
+            self.monto_cashback = self.calcular_cashback()
+        elif self.tipo == 'COMPRA' and self.es_a_meses:
+            self.monto_cashback = 0  # ← Las compras a meses NO generan cashback
+        super().save(*args, **kwargs)
+        
         if hasattr(self, 'tarjeta') and self.tarjeta:
             self.tarjeta.actualizar_saldo()
     
