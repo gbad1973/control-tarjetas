@@ -1,3 +1,4 @@
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -402,11 +403,46 @@ def lista_movimientos(request):
     total_abonos = sum(m['abono'] for m in movimientos_final if m['abono'])
     saldo = total_cargos - total_abonos
     
+    # Obtener parámetros de filtro
+    buscar = request.GET.get('buscar')
+    tipo = request.GET.get('tipo')
+    persona_id = request.GET.get('persona')
+    tarjeta_id = request.GET.get('tarjeta')
+    fecha_desde = request.GET.get('fecha_desde')
+    fecha_hasta = request.GET.get('fecha_hasta')
+    
+    # Filtrar
+    movimientos_filtrados = movimientos_final.copy()
+    
+    if buscar:
+        movimientos_filtrados = [m for m in movimientos_filtrados if 
+                                buscar.lower() in m['descripcion'].lower() or
+                                (m['persona'] and buscar.lower() in m['persona'].nombre.lower())]
+    
+    if tipo and tipo != '':
+        movimientos_filtrados = [m for m in movimientos_filtrados if m['tipo'] == tipo]
+    
+    if persona_id and persona_id != '':
+        movimientos_filtrados = [m for m in movimientos_filtrados 
+                                if m['persona'] and str(m['persona'].id) == persona_id]
+    
+    if tarjeta_id and tarjeta_id != '':
+        movimientos_filtrados = [m for m in movimientos_filtrados 
+                                if m['tarjeta'] and str(m['tarjeta'].id) == tarjeta_id]
+    
+    if fecha_desde:
+        movimientos_filtrados = [m for m in movimientos_filtrados 
+                                if m['fecha'] and str(m['fecha']) >= fecha_desde]
+    
+    if fecha_hasta:
+        movimientos_filtrados = [m for m in movimientos_filtrados 
+                                if m['fecha'] and str(m['fecha']) <= fecha_hasta]
+    
     personas = Persona.objects.filter(activo=True)
     tarjetas = Tarjeta.objects.filter(activa=True)
     
     return render(request, 'tarjetas_app/lista_movimientos.html', {
-        'movimientos': movimientos_final,
+        'movimientos': movimientos_filtrados,
         'personas': personas,
         'tarjetas': tarjetas,
         'total_cargos': total_cargos,
@@ -952,12 +988,7 @@ def cargar_mensualidad(request, compra_id):
         
         return redirect('detalle_persona', persona_id=compra.persona.id)
 
-
-
-
 # ==========. ESTO ES PARA EXPORTAR A  EXCEL. ======================
-
-
 
 def exportar_excel_movimientos(request, persona_id=None):
     """Exporta movimientos a Excel (formato CSV)"""
@@ -993,7 +1024,75 @@ def exportar_excel_movimientos(request, persona_id=None):
     
     return response
 
+# ================= CONTROL DE COMPRAS A MESES.  ========================
 
+@login_required
+def reporte_compras_meses(request):
+    """Reporte de compras a meses con su estado y mensualidades"""
+    from django.db.models import Sum
+    
+    compras_meses = Movimiento.objects.filter(
+        tipo='COMPRA',
+        es_a_meses=True
+    ).select_related('persona', 'tarjeta', 'establecimiento').order_by('fecha')
+    
+    reporte = []
+    total_general = 0
+    total_pagado_general = 0
+    total_pendiente_general = 0
+    
+    for c in compras_meses:
+        # Calcular mensualidades generadas
+        mensualidades = Movimiento.objects.filter(
+            tipo='MENSUALIDAD',
+            descripcion__icontains=f"compra {c.id}"
+        ).order_by('fecha')
+        
+        monto_mensual = c.monto / c.numero_meses
+        total_mensualidades = mensualidades.count()
+        monto_pagado = monto_mensual * total_mensualidades
+        monto_pendiente = c.monto - monto_pagado
+        
+        # Obtener detalles de cada mensualidad
+        detalle_mensualidades = []
+        for i, m in enumerate(mensualidades, 1):
+            detalle_mensualidades.append({
+                'numero': i,
+                'monto': m.monto,
+                'pagado': m.pagos_recibidos.aggregate(total=Sum('monto_aplicado'))['total'] or 0,
+                'saldo': m.monto - (m.pagos_recibidos.aggregate(total=Sum('monto_aplicado'))['total'] or 0)
+            })
+        
+        reporte.append({
+            'id': c.id,
+            'fecha': c.fecha,
+            'descripcion': c.descripcion,
+            'persona': c.persona,
+            'tarjeta': c.tarjeta,
+            'establecimiento': c.establecimiento.nombre if c.establecimiento else '-',
+            'monto_total': c.monto,
+            'numero_meses': c.numero_meses,
+            'monto_mensual': monto_mensual,
+            'mensualidades_generadas': total_mensualidades,
+            'mensualidades_pendientes': c.numero_meses - total_mensualidades,
+            'monto_pagado': monto_pagado,
+            'monto_pendiente': monto_pendiente,
+            'porcentaje_completado': (total_mensualidades / c.numero_meses) * 100 if c.numero_meses > 0 else 0,
+            'detalle_mensualidades': detalle_mensualidades,
+        })
+        
+        total_general += c.monto
+        total_pagado_general += monto_pagado
+        total_pendiente_general += monto_pendiente
+    
+    context = {
+        'reporte': reporte,
+        'total_general': total_general,
+        'total_pagado_general': total_pagado_general,
+        'total_pendiente_general': total_pendiente_general,
+        'total_compras': len(reporte),
+    }
+    return render(request, 'tarjetas_app/reporte_compras_meses.html', context)
 
 # ========== REPORTES ==========
 @login_required
@@ -1059,9 +1158,6 @@ def reporte_cashback(request):
         'total_cashback': total_cashback,
     }
     return render(request, 'tarjetas_app/reporte_cashback.html', context)
-
-
-
 
 @login_required 
 def reporte_cashback_persona(request, persona_id):

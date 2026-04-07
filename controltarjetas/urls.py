@@ -5,6 +5,7 @@ from tarjetas_app import views
 from tarjetas_app.views_api import api_personas_tarjeta
 from tarjetas_app.views import exportar_excel_movimientos
 from tarjetas_app.views import reporte_cashback
+from tarjetas_app.views import reporte_compras_meses
 
 
 urlpatterns = [
@@ -55,6 +56,7 @@ urlpatterns = [
     path('reportes/deudas/', views.reporte_deudas, name='reporte_deudas'),
     path('tarjeta/<int:tarjeta_id>/movimientos/', views.movimientos_tarjeta, name='movimientos_tarjeta'),
     path('reporte/cashback/', reporte_cashback, name='reporte_cashback'),
+    path('reporte/compras-meses/', reporte_compras_meses, name='reporte_compras_meses'),
     
     
     # ESTO ES PARA EXPORTAR A EXCEL

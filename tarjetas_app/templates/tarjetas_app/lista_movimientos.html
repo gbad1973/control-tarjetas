@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -117,7 +118,6 @@
             display: inline-block;
         }
         
-        /* Nuevo estilo para botón Excel */
         .btn-excel {
             background: linear-gradient(to right, #10b981, #34d399);
             color: white;
@@ -160,7 +160,6 @@
             color: #1f2937;
         }
         
-        /* ESTILOS PARA FILAS DE PAGO */
         .fila-pago {
             background-color: #d1fae5 !important;
             border-left: 4px solid #059669;
@@ -170,20 +169,16 @@
             color: #065f46;
         }
         
-        /* ESTILOS PARA COMPRAS PENDIENTES */
         .fila-compra-pendiente {
             background-color: #fff3cd !important;
             border-left: 4px solid #d97706;
         }
         
-        /* ESTILOS PARA mensualidad  PENDIENTES */
         .fila-mensualidad {
             background-color: #fff3cd !important;
             border-left: 4px solid #d97706;
         }
 
-
-        /* ESTILOS PARA COMPRAS QUE SERÁN PAGADAS (DETALLE) */
         .fila-compra-detalle {
             background-color: #f3f4f6 !important;
             border-left: 4px solid #6b7280;
@@ -200,13 +195,11 @@
             background-color: #e5e7eb !important;
         }
         
-        /* ESTILOS PARA MENSUALIDADES */
         .fila-mensualidad {
             background-color: #dbeafe !important;
             border-left: 4px solid #2563eb;
         }
         
-        /* TIPOS DE MOVIMIENTO */
         .tipo-badge {
             padding: 4px 10px;
             border-radius: 20px;
@@ -333,7 +326,6 @@
             font-weight: 600;
         }
         
-        /* GRUPO DE COMPRAS PAGADAS */
         .grupo-pago {
             border-top: 2px dashed #059669;
             border-bottom: 2px dashed #059669;
@@ -393,12 +385,12 @@
         </div>
         
         <div class="movimientos-table">
-            <!-- FILTROS -->
+            <!-- FILTROS CORREGIDOS -->
             <form id="filtrosForm" method="get" action="">
                 <div class="filtros">
                     <div class="filtro-buscar">
                         <label for="buscar">🔍 Buscar</label>
-                        <input type="text" id="buscar" name="buscar" placeholder="Descripción..." value="{{ request.GET.buscar }}">
+                        <input type="text" id="buscar" name="buscar" placeholder="Descripción, persona, tarjeta..." value="{{ request.GET.buscar }}">
                     </div>
                     
                     <div class="filtro-item">
@@ -407,6 +399,7 @@
                             <option value="">Todos</option>
                             <option value="COMPRA" {% if request.GET.tipo == 'COMPRA' %}selected{% endif %}>Compra</option>
                             <option value="PAGO" {% if request.GET.tipo == 'PAGO' %}selected{% endif %}>Pago</option>
+                            <option value="MENSUALIDAD" {% if request.GET.tipo == 'MENSUALIDAD' %}selected{% endif %}>Mensualidad</option>
                         </select>
                     </div>
                     
@@ -416,6 +409,16 @@
                             <option value="">Todas</option>
                             {% for persona in personas %}
                             <option value="{{ persona.id }}" {% if request.GET.persona == persona.id|stringformat:"s" %}selected{% endif %}>{{ persona.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="filtro-item">
+                        <label for="filtro-tarjeta">💳 Tarjeta</label>
+                        <select id="filtro-tarjeta" name="tarjeta">
+                            <option value="">Todas</option>
+                            {% for tarjeta in tarjetas %}
+                            <option value="{{ tarjeta.id }}" {% if request.GET.tarjeta == tarjeta.id|stringformat:"s" %}selected{% endif %}>{{ tarjeta.banco }} - ****{{ tarjeta.numero|slice:"-4:" }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -433,10 +436,7 @@
                     <div class="filtro-acciones">
                         <button type="submit" class="btn-filtrar">🔍 Buscar</button>
                         <a href="{% url 'lista_movimientos' %}" class="btn-limpiar">🧹 Limpiar</a>
-                        <!-- BOTÓN DE EXCEL AGREGADO -->
-                        <button type="button" onclick="exportarExcel()" class="btn-excel">
-                            📊 Excel
-                        </button>
+                        <button type="button" onclick="exportarExcel()" class="btn-excel">📊 Excel</button>
                     </div>
                 </div>
             </form>
@@ -540,11 +540,27 @@
     </div>
     
     <script>
+        // Filtro con Enter
         document.getElementById('buscar').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') document.getElementById('filtrosForm').submit();
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('filtrosForm').submit();
+            }
         });
         
-        // Función para exportar a Excel
+        // Auto-submit al cambiar cualquier filtro
+        const filtroTipo = document.getElementById('filtro-tipo');
+        const filtroPersona = document.getElementById('filtro-persona');
+        const filtroTarjeta = document.getElementById('filtro-tarjeta');
+        const fechaDesde = document.getElementById('fecha_desde');
+        const fechaHasta = document.getElementById('fecha_hasta');
+        
+        if (filtroTipo) filtroTipo.addEventListener('change', function() { document.getElementById('filtrosForm').submit(); });
+        if (filtroPersona) filtroPersona.addEventListener('change', function() { document.getElementById('filtrosForm').submit(); });
+        if (filtroTarjeta) filtroTarjeta.addEventListener('change', function() { document.getElementById('filtrosForm').submit(); });
+        if (fechaDesde) fechaDesde.addEventListener('change', function() { document.getElementById('filtrosForm').submit(); });
+        if (fechaHasta) fechaHasta.addEventListener('change', function() { document.getElementById('filtrosForm').submit(); });
+        
         function exportarExcel() {
             window.location.href = "{% url 'exportar_excel' %}";
         }

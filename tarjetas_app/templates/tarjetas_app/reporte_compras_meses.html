@@ -1,0 +1,178 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compras a Meses - Control de Tarjetas</title>
+    {% load humanize %}
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); padding: 25px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        .header h1 { color: #1f2937; font-size: 1.5rem; font-weight: 600; }
+        .btn { padding: 8px 16px; border: none; border-radius: 8px; font-weight: 500; font-size: 0.85rem; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s ease; }
+        .btn-primary { background: linear-gradient(to right, #4f46e5, #7c3aed); color: white; }
+        .btn-secondary { background: #f3f4f6; color: #6b7280; }
+        
+        /* Tarjetas de resumen */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .stat-card { background: white; border-radius: 12px; padding: 15px; border: 1px solid #e5e7eb; text-align: center; }
+        .stat-card .label { color: #6b7280; font-size: 0.85rem; margin-bottom: 8px; }
+        .stat-card .value { font-size: 1.5rem; font-weight: 700; }
+        .stat-card.total .value { color: #4f46e5; }
+        .stat-card.pagado .value { color: #10b981; }
+        .stat-card.pendiente .value { color: #ef4444; }
+        
+        /* Tablas */
+        .compra-card { background: #f8fafc; border-radius: 12px; margin-bottom: 20px; border: 1px solid #e5e7eb; overflow: hidden; }
+        .compra-header { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; padding: 15px 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .compra-header:hover { opacity: 0.95; }
+        .compra-header h3 { font-size: 1rem; font-weight: 600; }
+        .compra-progreso { width: 200px; height: 8px; background: rgba(255,255,255,0.3); border-radius: 4px; overflow: hidden; }
+        .compra-progreso-fill { height: 100%; background: #10b981; border-radius: 4px; }
+        .compra-body { padding: 20px; display: none; }
+        .compra-body.visible { display: block; }
+        .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .info-item { background: white; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb; }
+        .info-label { color: #6b7280; font-size: 0.75rem; text-transform: uppercase; margin-bottom: 5px; }
+        .info-value { font-size: 1rem; font-weight: 600; color: #1f2937; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th { background: #f3f4f6; color: #4f46e5; padding: 10px; text-align: left; font-size: 0.85rem; }
+        td { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; font-size: 0.85rem; }
+        .text-right { text-align: right; }
+        .badge { padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-info { background: #dbeafe; color: #1e40af; }
+        
+        @media (max-width: 768px) {
+            .compra-header { flex-direction: column; align-items: flex-start; }
+            .stats-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📅 Compras a Meses</h1>
+            <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                ← Volver al Dashboard
+            </a>
+        </div>
+
+        <!-- Resumen general -->
+        <div class="stats-grid">
+            <div class="stat-card total">
+                <div class="label">💰 Total Compras</div>
+                <div class="value">${{ total_general|floatformat:2|intcomma }}</div>
+            </div>
+            <div class="stat-card pagado">
+                <div class="label">✅ Pagado</div>
+                <div class="value">${{ total_pagado_general|floatformat:2|intcomma }}</div>
+            </div>
+            <div class="stat-card pendiente">
+                <div class="label">⏳ Pendiente</div>
+                <div class="value">${{ total_pendiente_general|floatformat:2|intcomma }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">📦 Compras Activas</div>
+                <div class="value">{{ total_compras }}</div>
+            </div>
+        </div>
+
+        <!-- Lista de compras a meses -->
+        <h2 style="margin-bottom: 15px;">📋 Compras a Meses Registradas</h2>
+        
+        {% for c in reporte %}
+        <div class="compra-card">
+            <div class="compra-header" onclick="toggleCompra({{ forloop.counter }})">
+                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                    <h3>🛒 {{ c.descripcion|truncatechars:40 }}</h3>
+                    <span class="badge badge-info">{{ c.persona.nombre }}</span>
+                    <span class="badge badge-success">{{ c.numero_meses }} meses</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                    <span>${{ c.monto_total|floatformat:2|intcomma }}</span>
+                    <div class="compra-progreso">
+                        <div class="compra-progreso-fill" style="width: {{ c.porcentaje_completado }}%;"></div>
+                    </div>
+                    <span>{{ c.mensualidades_generadas }}/{{ c.numero_meses }}</span>
+                    <span class="badge {% if c.monto_pendiente == 0 %}badge-success{% else %}badge-warning{% endif %}">
+                        Pendiente: ${{ c.monto_pendiente|floatformat:2|intcomma }}
+                    </span>
+                </div>
+            </div>
+            <div class="compra-body" id="compra-{{ forloop.counter }}">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Fecha de compra</div>
+                        <div class="info-value">{{ c.fecha|date:"d/m/Y" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Establecimiento</div>
+                        <div class="info-value">{{ c.establecimiento }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Tarjeta</div>
+                        <div class="info-value">{{ c.tarjeta.banco }} - ****{{ c.tarjeta.numero|slice:"-4:" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Monto mensual</div>
+                        <div class="info-value">${{ c.monto_mensual|floatformat:2|intcomma }}</div>
+                    </div>
+                </div>
+
+                <!-- Tabla de mensualidades -->
+                <h4 style="margin: 15px 0 10px 0;">📅 Mensualidades</h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Monto</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in c.detalle_mensualidades %}
+                        <tr>
+                            <td>Mensualidad {{ m.numero }}/{{ c.numero_meses }}</td>
+                            <td>${{ m.monto|floatformat:2|intcomma }}</td>
+                            <td>
+                                {% if m.saldo == 0 %}
+                                    <span class="badge badge-success">✅ Pagada</span>
+                                {% else %}
+                                    <span class="badge badge-warning">⏳ Pendiente</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% for i in c.mensualidades_pendientes|rjust:c.mensualidades_pendientes %}
+                        <tr style="opacity: 0.6;">
+                            <td>Mensualidad {{ c.mensualidades_generadas|add:forloop.counter }}/{{ c.numero_meses }}</td>
+                            <td>${{ c.monto_mensual|floatformat:2|intcomma }}</td>
+                            <td><span class="badge badge-warning">⏳ Por cargar</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% empty %}
+        <div style="text-align: center; padding: 60px;">
+            <span style="font-size: 3rem;">📦</span>
+            <h3 style="margin-top: 15px; color: #6b7280;">No hay compras a meses registradas</h3>
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        function toggleCompra(id) {
+            const element = document.getElementById('compra-' + id);
+            element.classList.toggle('visible');
+        }
+    </script>
+</body>
+</html>
