@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -5,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Control de Tarjetas</title>
     <style>
-        /* (Mantén tus estilos exactamente como están, no los cambio) */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
         .dashboard-wrapper { width: 100%; max-width: 1400px; height: 95vh; min-height: 700px; }
@@ -97,6 +97,7 @@
             .tarjeta-numero { font-size: 1.2rem; }
         }
     </style>
+    {% load humanize %}
 </head>
 <body>
     <div class="dashboard-wrapper">
@@ -167,19 +168,10 @@
                     <div class="selector-header">
                         <h3>🔍 Seleccionar Tarjeta</h3>
                     </div>
-                    <select class="tarjeta-select" id="selectorTarjeta">
+                    <select class="tarjeta-select" id="selectorTarjeta" name="tarjeta">
                         <option value="">-- Selecciona una tarjeta --</option>
                         {% for tarjeta in tarjetas %}
-                        <option value="{{ tarjeta.id }}" 
-                                data-banco="{{ tarjeta.banco }}"
-                                data-tipo="{{ tarjeta.get_tipo_display }}"
-                                data-numero="{{ tarjeta.numero }}"
-                                data-limite="{{ tarjeta.limite_credito }}"
-                                data-saldo="{{ tarjeta.saldo_actual }}"
-                                data-disponible="{{ tarjeta.saldo_disponible }}"
-                                data-personas="{{ tarjeta.usuarios.count }}"
-                                data-activa="{{ tarjeta.activa }}"
-                                data-tarjeta-id="{{ tarjeta.id }}">
+                        <option value="{{ tarjeta.id }}" {% if tarjeta_seleccionada.id == tarjeta.id %}selected{% endif %}>
                             {{ tarjeta.banco }} - {{ tarjeta.get_tipo_display }}
                         </option>
                         {% empty %}
@@ -188,56 +180,54 @@
                     </select>
                 </div>
                 
-                <!-- TARJETA DE CRÉDITO (con cashback) -->
-                <div class="tarjeta-info color-banamex" id="infoTarjeta">
+                <!-- TARJETA DE CRÉDITO -->
+                <div class="tarjeta-info color-banamex" id="infoTarjeta" style="display: {% if tarjeta_seleccionada %}block{% else %}none{% endif %};">
                     <div class="tarjeta-chip"></div>
                     
                     <div class="tarjeta-header">
                         <div class="banco-info">
-                            <div class="banco-nombre" id="infoBanco">BANCO</div>
-                            <div class="tarjeta-tipo" id="infoTipo">Tipo</div>
+                            <div class="banco-nombre" id="infoBanco">{{ tarjeta_seleccionada.banco|default:"BANCO" }}</div>
+                            <div class="tarjeta-tipo" id="infoTipo">{{ tarjeta_seleccionada.get_tipo_display|default:"Tipo" }}</div>
                         </div>
-                        <div class="tarjeta-estado" id="estadoTarjeta">✅ Activa</div>
+                        <div class="tarjeta-estado" id="estadoTarjeta">{% if tarjeta_seleccionada.activa %}✅ Activa{% else %}❌ Inactiva{% endif %}</div>
                     </div>
                     
-                    <div class="tarjeta-numero" id="infoNumero">**** **** **** ****</div>
+                    <div class="tarjeta-numero" id="infoNumero">{{ tarjeta_seleccionada.numero|default:"**** **** **** ****" }}</div>
                     
-                    <!-- NUEVO: Ajustamos grid a 5 columnas y añadimos cashback -->
                     <div class="info-grid" style="grid-template-columns: repeat(5, 1fr);">
                         <div class="info-item">
                             <span class="info-label">Límite</span>
-                            <span class="info-value moneda" id="infoLimite">$0.00</span>
+                            <span class="info-value moneda" id="infoLimite">${{ tarjeta_seleccionada.limite_credito|floatformat:2|intcomma|default:"0.00" }}</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Saldo</span>
-                            <span class="info-value moneda" id="infoSaldo">$0.00</span>
+                            <span class="info-label">Saldo actual</span>
+                            <span class="info-value moneda" id="infoSaldo">${{ tarjeta_seleccionada.saldo_actual|floatformat:2|intcomma|default:"0.00" }}</span>
                         </div>
                         <div class="info-item">
                             <span class="info-label">Disponible</span>
-                            <span class="info-value moneda" id="infoDisponible">$0.00</span>
+                            <span class="info-value moneda" id="infoDisponible">${{ tarjeta_seleccionada.saldo_disponible|floatformat:2|intcomma|default:"0.00" }}</span>
                         </div>
                         <div class="info-item">
                             <span class="info-label">Usuarios</span>
-                            <span class="info-value" id="infoPersonas">0</span>
+                            <span class="info-value" id="infoPersonas">{{ tarjeta_seleccionada.usuarios.count|default:"0" }}</span>
                         </div>
-                        <!-- NUEVO: Cashback Total -->
                         <div class="info-item">
                             <span class="info-label">Cashback</span>
-                            <span class="info-value moneda" id="infoCashback">$0.00</span>
+                            <span class="info-value moneda" id="infoCashback">${{ total_cashback|floatformat:2|intcomma|default:"0.00" }}</span>
                         </div>
                     </div>
                 </div>
                 
-                <!-- ESTADÍSTICAS (NUEVO: CASHBACK TOTAL) -->
+                <!-- ESTADÍSTICAS -->
                 <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-icon">💰</div>
-                        <div class="stat-value" id="disponibleTotal">$0.00</div>
+                        <div class="stat-value" id="disponibleTotal">${{ total_disponible|floatformat:2|intcomma|default:"0.00" }}</div>
                         <div class="stat-label">Disponible Total</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">👥</div>
-                        <div class="stat-value" id="personasActivas">0</div>
+                        <div class="stat-value" id="personasActivas">{{ personas|length }}</div>
                         <div class="stat-label">Personas Activas</div>
                     </div>
                     <div class="stat-card">
@@ -247,19 +237,55 @@
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">📊</div>
-                        <div class="stat-value" id="totalMovimientos">0</div>
+                        <div class="stat-value" id="totalMovimientos">{{ total_movimientos }}</div>
                         <div class="stat-label">Movimientos</div>
                     </div>
-                    <!-- NUEVA TARJETA DE CASHBACK -->
                     <div class="stat-card">
                         <div class="stat-icon">💰</div>
-                        <div class="stat-value" id="totalCashback">$0.00</div>
+                        <div class="stat-value" id="totalCashback">${{ total_cashback|floatformat:2|intcomma|default:"0.00" }}</div>
                         <div class="stat-label">Cashback Generado</div>
                     </div>
                 </div>
                 
-                <!-- CONTENEDOR DE PERSONAS -->
-                <div id="personasContainer"></div>
+                <!-- PERSONAS (directamente desde Django) -->
+                <div class="personas-section">
+                    <h2 class="section-title">👥 Personas de esta Tarjeta</h2>
+                    <div class="personas-grid">
+                        {% for persona in personas %}
+                        <div class="persona-card">
+                            <div class="persona-header">
+                                <div class="persona-avatar">{{ persona.nombre|first }}</div>
+                                <div class="persona-details">
+                                    <h3>{{ persona.nombre }}</h3>
+                                    <p>{% if persona.activo %}✅ Activo{% else %}❌ Inactivo{% endif %}</p>
+                                </div>
+                            </div>
+                            <div class="persona-stats">
+                                <div class="persona-stat">
+                                    <span class="stat-name">💰 Saldo en esta tarjeta</span>
+                                    <span class="stat-amount">${{ persona.saldo_pendiente|floatformat:2|intcomma }}</span>
+                                </div>
+                                <div class="persona-stat">
+                                    <span class="stat-name">📊 Movimientos</span>
+                                    <span class="stat-amount">{{ persona.total_movimientos }}</span>
+                                </div>
+                                <div class="persona-stat">
+                                    <span class="stat-name">💰 Cashback</span>
+                                    <span class="stat-amount">${{ persona.cashback|floatformat:2|intcomma }}</span>
+                                </div>
+                            </div>
+                            <div class="persona-actions">
+                                <a href="{% url 'detalle_persona' persona.id %}{% if tarjeta_seleccionada %}?tarjeta={{ tarjeta_seleccionada.id }}{% endif %}" class="btn btn-primary">📊 Ver Detalle</a>
+                                <a href="{% url 'editar_persona' persona.id %}" class="btn btn-secondary">✏️ Editar</a>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div style="text-align: center; padding: 40px; background: #f8fafc; border-radius: 12px;">
+                            <p style="color: #6b7280;">No hay personas asignadas a esta tarjeta</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
                 
                 <!-- Footer -->
                 <div class="dashboard-footer">
@@ -274,192 +300,15 @@
     </div>
     
     <script>
-        // Elementos principales
+        // Selector de tarjeta - recarga la página con la tarjeta seleccionada
         const selectorTarjeta = document.getElementById('selectorTarjeta');
-        const infoTarjeta = document.getElementById('infoTarjeta');
-        const disponibleTotal = document.getElementById('disponibleTotal');
-        const personasActivas = document.getElementById('personasActivas');
-        const totalMovimientos = document.getElementById('totalMovimientos');
-        const totalCashback = document.getElementById('totalCashback');
-        const infoCashback = document.getElementById('infoCashback'); // NUEVO
-        const personasContainer = document.getElementById('personasContainer');
-        
-        // Mapeo de bancos a colores
-        const coloresBancos = {
-            'BANAMEX': 'color-banamex',
-            'CITIBANAMEX': 'color-banamex',
-            'BANORTE': 'color-banorte',
-            'BBVA': 'color-bbva',
-            'BANCOMER': 'color-bbva',
-            'SANTANDER': 'color-santander',
-            'HSBC': 'color-hsbc',
-            'SCOTIABANK': 'color-scotiabank'
-        };
-        
-        // Formato de moneda
-        const formatoMoneda = (valor) => {
-            const numero = parseFloat(valor) || 0;
-            return '$' + numero.toLocaleString('es-MX', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
+        if (selectorTarjeta) {
+            selectorTarjeta.addEventListener('change', function() {
+                const tarjetaId = this.value;
+                let url = `/dashboard/?tarjeta=${tarjetaId}`;
+                window.location.href = url;
             });
-        };
-        
-        // Formato de número de tarjeta
-        const formatoNumeroTarjeta = (numero) => {
-            if (!numero) return '**** **** **** ****';
-            let numLimpio = numero.toString().replace(/\s/g, '');
-            let formateado = '';
-            for (let i = 0; i < numLimpio.length; i += 4) {
-                formateado += numLimpio.substring(i, i + 4) + ' ';
-            }
-            return formateado.trim() || '**** **** **** ****';
-        };
-        
-        // Obtener color según banco
-        function obtenerColorBanco(nombreBanco) {
-            const bancoUpper = nombreBanco.toUpperCase();
-            for (const [key, colorClass] of Object.entries(coloresBancos)) {
-                if (bancoUpper.includes(key)) {
-                    return colorClass;
-                }
-            }
-            return 'color-banamex';
         }
-        
-        // Cargar datos de la tarjeta
-        async function cargarDatosTarjeta(tarjetaId) {
-            if (!tarjetaId) {
-                personasContainer.innerHTML = '';
-                disponibleTotal.textContent = '$0.00';
-                personasActivas.textContent = '0';
-                totalMovimientos.textContent = '0';
-                totalCashback.textContent = '$0.00';
-                infoCashback.textContent = '$0.00'; // NUEVO
-                return;
-            }
-            
-            try {
-                const response = await fetch(`/tarjetas/api/personas/${tarjetaId}/?_=${Date.now()}`);
-                const data = await response.json();
-                
-                // 🔍 DEPURACIÓN: Mostrar el valor de cashback_total en consola
-                console.log('cashback_total desde API:', data.cashback_total);
-                
-                disponibleTotal.textContent = formatoMoneda(data.disponible_total || 0);
-                personasActivas.textContent = data.personas_count || 0;
-                totalMovimientos.textContent = data.movimientos_count || 0;
-                totalCashback.textContent = formatoMoneda(data.cashback_total || 0);
-                infoCashback.textContent = formatoMoneda(data.cashback_total || 0); // NUEVO
-                
-                renderizarPersonas(data.personas || []);
-            } catch (error) {
-                console.error('Error:', error);
-            }
-        }
-        
-        // Renderizar personas (AHORA INCLUYE CASHBACK)
-        function renderizarPersonas(personas) {
-            if (!personas || personas.length === 0) {
-                personasContainer.innerHTML = `
-                    <div class="personas-section">
-                        <h2 class="section-title">👥 Personas de esta Tarjeta</h2>
-                        <div style="text-align: center; padding: 40px; background: #f8fafc; border-radius: 12px;">
-                            <span style="font-size: 3rem; display: block; margin-bottom: 15px;">👤</span>
-                            <p style="color: #6b7280; font-size: 1.1rem;">No hay personas asignadas a esta tarjeta</p>
-                        </div>
-                    </div>
-                `;
-                return;
-            }
-            
-            let html = `
-                <div class="personas-section">
-                    <h2 class="section-title">👥 Personas de esta Tarjeta</h2>
-                    <div class="personas-grid">
-            `;
-            
-            personas.forEach(persona => {
-                const deuda = parseFloat(persona.deuda_total) || 0;
-                const deudaClass = deuda > 0 ? 'positivo' : (deuda < 0 ? 'negativo' : '');
-                const cashback = parseFloat(persona.cashback_generado) || 0; // NUEVO
-                
-                html += `
-                    <div class="persona-card">
-                        <div class="persona-header">
-                            <div class="persona-avatar">${persona.nombre.charAt(0)}</div>
-                            <div class="persona-details">
-                                <h3>${persona.nombre}</h3>
-                                <p>${persona.activo ? '✅ Activo' : '❌ Inactivo'}</p>
-                            </div>
-                        </div>
-                        <div class="persona-stats">
-                            <div class="persona-stat">
-                                <span class="stat-name">💰 Saldo en esta tarjeta</span>
-                                <span class="stat-amount ${deudaClass}">${formatoMoneda(deuda)}</span>
-                            </div>
-                            <div class="persona-stat">
-                                <span class="stat-name">📊 Movimientos</span>
-                                <span class="stat-amount">${persona.total_movimientos || 0}</span>
-                            </div>
-                            <!-- NUEVA LÍNEA PARA CASHBACK POR PERSONA -->
-                            <div class="persona-stat">
-                                <span class="stat-name">💰 Cashback</span>
-                                <span class="stat-amount">${formatoMoneda(cashback)}</span>
-                            </div>
-                        </div>
-                        <div class="persona-actions">
-                            <a href="/persona/${persona.id}/?tarjeta=${selectorTarjeta.value}" class="btn btn-primary">📊 Ver Detalle</a>
-                            <a href="/personas/${persona.id}/editar/" class="btn btn-secondary">✏️ Editar</a>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            html += `</div></div>`;
-            personasContainer.innerHTML = html;
-        }
-        
-        // Evento al cambiar de tarjeta
-        selectorTarjeta.addEventListener('change', function(e) {
-            const option = e.target.options[e.target.selectedIndex];
-            
-            if (option.value) {
-                infoTarjeta.style.display = 'block';
-                
-                const banco = option.dataset.banco || 'BANCO';
-                const tipo = option.dataset.tipo || 'Tipo';
-                const numero = option.dataset.numero || '';
-                const limite = parseFloat(option.dataset.limite) || 0;
-                const saldo = parseFloat(option.dataset.saldo) || 0;
-                const disponible = parseFloat(option.dataset.disponible) || 0;
-                const personas = option.dataset.personas || 0;
-                const activa = option.dataset.activa === 'True';
-                
-                document.getElementById('infoBanco').textContent = banco;
-                document.getElementById('infoTipo').textContent = tipo;
-                document.getElementById('infoNumero').textContent = formatoNumeroTarjeta(numero);
-                document.getElementById('infoLimite').textContent = formatoMoneda(limite);
-                document.getElementById('infoSaldo').textContent = formatoMoneda(saldo);
-                document.getElementById('infoDisponible').textContent = formatoMoneda(disponible);
-                document.getElementById('infoPersonas').textContent = personas;
-                document.getElementById('estadoTarjeta').textContent = activa ? '✅ Activa' : '❌ Inactiva';
-                
-                // Color del banco
-                const colorClass = obtenerColorBanco(banco);
-                infoTarjeta.className = 'tarjeta-info ' + colorClass;
-                
-                cargarDatosTarjeta(option.value);
-            } else {
-                infoTarjeta.style.display = 'none';
-                personasContainer.innerHTML = '';
-                disponibleTotal.textContent = '$0.00';
-                personasActivas.textContent = '0';
-                totalMovimientos.textContent = '0';
-                totalCashback.textContent = '$0.00';
-                infoCashback.textContent = '$0.00'; // NUEVO
-            }
-        });
         
         // Inicializar con primera tarjeta
         {% if tarjetas %}
@@ -471,31 +320,6 @@
             }
         }, 100);
         {% endif %}
-        
-        // Reemplazar el ID 0 en la URL de detalle (si es necesario)
-        document.addEventListener('click', function(e) {
-            if (e.target.closest('.btn-primary') && e.target.closest('.btn-primary').href.includes('detalle_persona/0')) {
-                e.preventDefault();
-                const personaCard = e.target.closest('.persona-card');
-                if (personaCard) {
-                    const avatar = personaCard.querySelector('.persona-avatar');
-                    if (avatar) {
-                        const personaId = personaCard.querySelector('.btn-primary').href.replace('{% url "detalle_persona" 0 %}?tarjeta=', '').split('?')[0];
-                        const tarjetaId = selectorTarjeta.value;
-                        window.location.href = `/persona/${personaId}/?tarjeta=${tarjetaId}`;
-                    }
-                }
-            }
-        });
-        
-        // Actualizar link de movimientos cuando cambia la tarjeta
-        selectorTarjeta.addEventListener('change', function(e) {
-            const tarjetaId = e.target.value;
-            const btnMovimientos = document.getElementById('btnMovimientosTarjeta');
-            if (btnMovimientos && tarjetaId) {
-                btnMovimientos.href = `/tarjeta/${tarjetaId}/movimientos/`;
-            }
-        });
     </script>
 </body>
 </html>

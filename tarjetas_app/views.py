@@ -44,60 +44,110 @@ def crear_usuario_admin(request):
     return render(request, 'tarjetas_app/crear_admin.html')
 
 # ========== DASHBOARD Y PRINCIPALES ==========
+
 @login_required
 def dashboard(request):
+    from django.db.models import Sum
+    
     tarjetas = Tarjeta.objects.filter(activa=True)
-    tarjeta_seleccionada = tarjetas.first() if tarjetas.exists() else None
+    tarjeta_id = request.GET.get('tarjeta')
+    
+    # Seleccionar tarjeta
+    tarjeta_seleccionada = None
+    if tarjeta_id:
+        tarjeta_seleccionada = get_object_or_404(Tarjeta, id=tarjeta_id)
+    elif tarjetas.exists():
+        tarjeta_seleccionada = tarjetas.first()
+    
+    personas = []
+    saldo_total_tarjeta = 0
     
     if tarjeta_seleccionada:
-        personas = tarjeta_seleccionada.usuarios.filter(activo=True)
-        for persona in personas:
-            movimientos_persona = Movimiento.objects.filter(
-                persona=persona, 
-                tarjeta=tarjeta_seleccionada
+        usuarios = tarjeta_seleccionada.usuarios.filter(activo=True)
+        for persona in usuarios:
+            # Calcular deuda de la persona
+            deuda_persona = 0
+            
+            # Compras normales pendientes
+            compras = Movimiento.objects.filter(
+                persona=persona,
+                tarjeta=tarjeta_seleccionada,
+                tipo='COMPRA',
+                es_a_meses=False
             )
+            for c in compras:
+                pagado = c.pagos_recibidos.aggregate(total=Sum('monto_aplicado'))['total'] or 0
+                saldo = c.monto - pagado
+                if saldo > 0:
+                    deuda_persona += saldo
             
-            deuda_total = 0
-            for movimiento in movimientos_persona:
-                if movimiento.tipo in ['COMPRA', 'COMISION', 'INTERES']:
-                    if not movimiento.es_a_meses:
-                        deuda_total += movimiento.monto
-                elif movimiento.tipo == 'MENSUALIDAD':
-                    deuda_total += movimiento.monto
-                elif movimiento.tipo in ['PAGO', 'CASHBACK']:
-                    deuda_total -= movimiento.monto
+            # Mensualidades pendientes
+            mensualidades = Movimiento.objects.filter(
+                persona=persona,
+                tarjeta=tarjeta_seleccionada,
+                tipo='MENSUALIDAD'
+            )
+            for m in mensualidades:
+                pagado = m.pagos_recibidos.aggregate(total=Sum('monto_aplicado'))['total'] or 0
+                saldo = m.monto - pagado
+                if saldo > 0:
+                    deuda_persona += saldo
             
-            persona.deuda_total = deuda_total
-            persona.total_movimientos = movimientos_persona.count()
-    else:
-        personas = []
+            # Acumular para saldo total de la tarjeta
+            saldo_total_tarjeta += deuda_persona
+            
+            # Cashback de la persona
+            cashback_persona = Movimiento.objects.filter(
+                persona=persona,
+                tarjeta=tarjeta_seleccionada,
+                tipo__in=['COMPRA', 'MENSUALIDAD']
+            ).aggregate(total=Sum('monto_cashback'))['total'] or 0
+            
+            personas.append({
+                'id': persona.id,
+                'nombre': persona.nombre,
+                'activo': persona.activo,
+                'saldo_pendiente': deuda_persona,
+                'total_movimientos': compras.count(),
+                'cashback': cashback_persona,
+            })
     
-    total_limite = tarjetas.aggregate(total=Sum('limite_credito'))['total'] or 0
-    total_saldo = tarjetas.aggregate(total=Sum('saldo_actual'))['total'] or 0
-    total_disponible = total_limite - total_saldo
+    # Calcular retenciones (mensualidades pendientes de compras a meses)
+    retenciones = 0
+    compras_meses = Movimiento.objects.filter(
+        tarjeta=tarjeta_seleccionada,
+        tipo='COMPRA',
+        es_a_meses=True
+    ) if tarjeta_seleccionada else []
+    
+    for c in compras_meses:
+        # Calcular cuánto falta por pagar de esta compra a meses
+        pagado = c.monto_mensual * c.meses_pagados if c.monto_mensual else 0
+        pendiente = c.monto - pagado
+        retenciones += pendiente
+    
+    # Totales
+    total_limite = tarjeta_seleccionada.limite_credito if tarjeta_seleccionada else 0
+    total_disponible = total_limite - saldo_total_tarjeta - retenciones
     total_cashback = Movimiento.objects.filter(
+        tarjeta=tarjeta_seleccionada,
         tipo__in=['COMPRA', 'MENSUALIDAD']
-    ).aggregate(total=Sum('monto_cashback'))['total'] or 0
-    
-    for persona in personas:
-        cashback_persona = Movimiento.objects.filter(
-            persona=persona,
-            tarjeta=tarjeta_seleccionada,
-            tipo__in=['COMPRA', 'MENSUALIDAD']
-        ).aggregate(total=Sum('monto_cashback'))['total'] or 0
-        persona.cashback = cashback_persona
+    ).aggregate(total=Sum('monto_cashback'))['total'] or 0 if tarjeta_seleccionada else 0
     
     context = {
         'personas': personas,
         'tarjetas': tarjetas,
         'tarjeta_seleccionada': tarjeta_seleccionada,
         'total_limite': total_limite,
-        'total_saldo': total_saldo,
+        'total_saldo': saldo_total_tarjeta,
         'total_disponible': total_disponible,
-        'total_movimientos': Movimiento.objects.count(),
+        'total_movimientos': Movimiento.objects.filter(tarjeta=tarjeta_seleccionada).count() if tarjeta_seleccionada else 0,
         'total_cashback': total_cashback,
+        'retenciones': retenciones,
     }
     return render(request, 'tarjetas_app/dashboard.html', context)
+
+
 
 # ========== FORMULARIOS NUEVOS ==========
 @login_required
