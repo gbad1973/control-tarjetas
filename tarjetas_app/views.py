@@ -13,6 +13,7 @@ from django.db import models
 from itertools import chain
 from operator import attrgetter
 from decimal import Decimal
+from django.core.paginator import Paginator
 
 
 import csv
@@ -488,17 +489,37 @@ def lista_movimientos(request):
         movimientos_filtrados = [m for m in movimientos_filtrados 
                                 if m['fecha'] and str(m['fecha']) <= fecha_hasta]
     
+    #personas = Persona.objects.filter(activo=True)
+    #tarjetas = Tarjeta.objects.filter(activa=True)
+    
+    #return render(request, 'tarjetas_app/lista_movimientos.html', {
+    #    'movimientos': movimientos_filtrados,
+    #    'personas': personas,
+    #    'tarjetas': tarjetas,
+    #    'total_cargos': total_cargos,
+    #    'total_abonos': total_abonos,
+    #    'saldo': saldo,
+    #})
+     
+    paginator = Paginator(movimientos_filtrados, 50)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
     personas = Persona.objects.filter(activo=True)
     tarjetas = Tarjeta.objects.filter(activa=True)
     
     return render(request, 'tarjetas_app/lista_movimientos.html', {
-        'movimientos': movimientos_filtrados,
+        'movimientos': page_obj,  # ← Solo cambia esto, de movimientos_filtrados a page_obj
         'personas': personas,
         'tarjetas': tarjetas,
         'total_cargos': total_cargos,
         'total_abonos': total_abonos,
         'saldo': saldo,
-    })
+    }) 
+   
+   
+   
+   
    
 # ========== EDITAR Y ELIMINAR ==========
 @login_required

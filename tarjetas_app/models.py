@@ -173,6 +173,7 @@ class Movimiento(models.Model):
             models.Index(fields=['tipo']),
             models.Index(fields=['persona']),
             models.Index(fields=['tarjeta']),
+             models.Index(fields=['fecha', 'tipo']),
         ]
     
     def __str__(self):
