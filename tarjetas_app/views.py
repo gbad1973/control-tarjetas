@@ -501,7 +501,7 @@ def lista_movimientos(request):
     #    'saldo': saldo,
     #})
      
-    paginator = Paginator(movimientos_filtrados, 50)
+    paginator = Paginator(movimientos_filtrados, 1000)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
