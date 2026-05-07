@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -140,9 +141,35 @@
             overflow-x: auto;
         }
         
+        .tabla-scroll-container {
+            max-height: 550px;
+            overflow-y: auto;
+            overflow-x: auto;
+            margin-top: 15px;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .tabla-scroll-container::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        .tabla-scroll-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .tabla-scroll-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        .tabla-scroll-container::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
         table {
             width: 100%;
             border-collapse: collapse;
+            min-width: 800px;
         }
         
         th {
@@ -152,6 +179,9 @@
             text-align: left;
             font-weight: 600;
             border-bottom: 2px solid #1e3a8a;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
         
         td {
@@ -174,11 +204,6 @@
             border-left: 4px solid #d97706;
         }
         
-        .fila-mensualidad {
-            background-color: #fff3cd !important;
-            border-left: 4px solid #d97706;
-        }
-
         .fila-compra-detalle {
             background-color: #f3f4f6 !important;
             border-left: 4px solid #6b7280;
@@ -303,17 +328,42 @@
             display: inline-block;
         }
         
+        .limite-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f8fafc;
+            padding: 8px 15px;
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+            margin-left: auto;
+        }
+        .limite-selector label {
+            font-weight: 600;
+            color: #4f46e5;
+            font-size: 0.85rem;
+            margin: 0;
+        }
+        .limite-selector select {
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 2px solid #e5e7eb;
+            background: white;
+            cursor: pointer;
+        }
+        
+        .info-movimientos {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
         .icono-movimiento {
             margin-right: 8px;
             font-size: 1.1rem;
-        }
-        
-        .badge-meses {
-            margin-left: 8px;
-            background: #e5e7eb;
-            padding: 2px 6px;
-            border-radius: 12px;
-            font-size: 0.7rem;
         }
         
         .aplicado-badge {
@@ -324,12 +374,6 @@
             border-radius: 12px;
             font-size: 0.7rem;
             font-weight: 600;
-        }
-        
-        .grupo-pago {
-            border-top: 2px dashed #059669;
-            border-bottom: 2px dashed #059669;
-            background-color: #f0fdf4;
         }
         
         @media (max-width: 768px) {
@@ -365,6 +409,16 @@
             .acciones {
                 flex-direction: column;
             }
+            
+            .info-movimientos {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .limite-selector {
+                margin-left: 0;
+                justify-content: center;
+            }
         }
     </style>
 </head>
@@ -385,7 +439,7 @@
         </div>
         
         <div class="movimientos-table">
-            <!-- FILTROS CORREGIDOS -->
+            <!-- FILTROS -->
             <form id="filtrosForm" method="get" action="">
                 <div class="filtros">
                     <div class="filtro-buscar">
@@ -441,94 +495,111 @@
                 </div>
             </form>
             
-            <div class="contador-resultados">
-                📊 Mostrando {{ movimientos|length }} movimientos
+            <!-- Selector de cantidad y contador -->
+            <div class="info-movimientos">
+                <div class="contador-resultados" id="contadorResultados">
+                    📊 Mostrando {{ movimientos|length }} de {{ total_movimientos_filtrados }} movimientos
+                </div>
+                <div class="limite-selector">
+                    <label>📊 Mostrar:</label>
+                    <select id="selectorLimite">
+                        <option value="20" {% if limite_actual == 20 %}selected{% endif %}>20 movimientos</option>
+                        <option value="50" {% if limite_actual == 50 %}selected{% endif %}>50 movimientos</option>
+                        <option value="100" {% if limite_actual == 100 %}selected{% endif %}>100 movimientos</option>
+                        <option value="200" {% if limite_actual == 200 %}selected{% endif %}>200 movimientos</option>
+                        <option value="500" {% if limite_actual == 500 %}selected{% endif %}>500 movimientos</option>
+                        <option value="todos" {% if limite_actual == 'todos' %}selected{% endif %}>Todos los movimientos</option>
+                    </select>
+                </div>
             </div>
             
             {% if movimientos %}
-            <table>
-                <thead>
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Descripción</th>
-                        <th>Persona</th>
-                        <th>Tarjeta</th>
-                        <th>Tipo</th>
-                        <th class="text-end">Cargo ($)</th>
-                        <th class="text-end">Abono ($)</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for m in movimientos %}
-                    <tr class="
-                        {% if m.tipo == 'PAGO' %}fila-pago{% endif %}
-                        {% if m.tipo == 'COMPRA' %}fila-compra-pendiente{% endif %}
-                        {% if m.tipo == 'MENSUALIDAD' %}fila-mensualidad{% endif %}
-                        {% if m.tipo == 'COMPRA_PAGADA' %}fila-compra-detalle{% endif %}
-                    ">
-                        
-                        <td>{% if m.fecha and not m.is_detalle %}{{ m.fecha|date:"d/m/Y" }}{% endif %}</td>
-                        <td class="{% if m.is_detalle %}descripcion-cell{% endif %}">
-                            <span class="icono-movimiento">
-                                {% if m.tipo == 'PAGO' %}💰
-                                {% elif m.tipo == 'COMPRA' %}🛒
-                                {% elif m.tipo == 'COMPRA_PAGADA' %}↳
+            <div class="tabla-scroll-container">
+                <table id="tablaMovimientos">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Descripción</th>
+                            <th>Persona</th>
+                            <th>Tarjeta</th>
+                            <th>Tipo</th>
+                            <th class="text-end">Cargo ($)</th>
+                            <th class="text-end">Abono ($)</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaMovimientosBody">
+                        {% for m in movimientos %}
+                        <tr class="
+                            {% if m.tipo == 'PAGO' %}fila-pago{% endif %}
+                            {% if m.tipo == 'COMPRA' %}fila-compra-pendiente{% endif %}
+                            {% if m.tipo == 'MENSUALIDAD' %}fila-mensualidad{% endif %}
+                            {% if m.tipo == 'COMPRA_PAGADA' %}fila-compra-detalle{% endif %}
+                        ">
+                            
+                            <td>{% if m.fecha and not m.is_detalle %}{{ m.fecha|date:"d/m/Y" }}{% endif %}</td>
+                            <td class="{% if m.is_detalle %}descripcion-cell{% endif %}">
+                                <span class="icono-movimiento">
+                                    {% if m.tipo == 'PAGO' %}💰
+                                    {% elif m.tipo == 'COMPRA' %}🛒
+                                    {% elif m.tipo == 'COMPRA_PAGADA' %}↳
+                                    {% endif %}
+                                </span>
+                                {{ m.descripcion }}
+                                {% if m.monto_aplicado %}
+                                    <span class="aplicado-badge">Aplicado: ${{ m.monto_aplicado|floatformat:2|intcomma }}</span>
                                 {% endif %}
-                            </span>
-                            {{ m.descripcion }}
-                            {% if m.monto_aplicado %}
-                                <span class="aplicado-badge">Aplicado: ${{ m.monto_aplicado|floatformat:2|intcomma }}</span>
-                            {% endif %}
-                        </td>
-                        <td>{{ m.persona.nombre }}</td>
-                        <td>{{ m.tarjeta.banco }} - ****{{ m.tarjeta.numero|slice:"-4:" }}</td>
-                        <td>
-                            <span class="tipo-badge 
-                                {% if m.tipo == 'PAGO' %}tipo-pago
-                                {% elif m.tipo == 'COMPRA' %}tipo-compra
-                                {% elif m.tipo == 'COMPRA_PAGADA' %}tipo-pagada
-                                {% endif %}">
-                                {% if m.tipo == 'PAGO' %}PAGO
-                                {% elif m.tipo == 'COMPRA' %}COMPRA PENDIENTE
-                                {% elif m.tipo == 'COMPRA_PAGADA' %}COMPRA PAGADA
+                            </td>
+                            <td>{{ m.persona.nombre }}</td>
+                            <td>{{ m.tarjeta.banco }} - ****{{ m.tarjeta.numero|slice:"-4:" }}</td>
+                            <td>
+                                <span class="tipo-badge 
+                                    {% if m.tipo == 'PAGO' %}tipo-pago
+                                    {% elif m.tipo == 'COMPRA' %}tipo-compra
+                                    {% elif m.tipo == 'COMPRA_PAGADA' %}tipo-pagada
+                                    {% endif %}">
+                                    {% if m.tipo == 'PAGO' %}PAGO
+                                    {% elif m.tipo == 'COMPRA' %}COMPRA PENDIENTE
+                                    {% elif m.tipo == 'COMPRA_PAGADA' %}COMPRA PAGADA
+                                    {% elif m.tipo == 'MENSUALIDAD' %}MENSUALIDAD
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                {% if m.cargo %}
+                                    <span class="monto-negativo">${{ m.cargo|floatformat:2|intcomma }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
                                 {% endif %}
-                            </span>
-                        </td>
-                        <td class="text-end">
-                            {% if m.cargo %}
-                                <span class="monto-negativo">${{ m.cargo|floatformat:2|intcomma }}</span>
-                            {% else %}
-                                <span class="text-muted">-</span>
-                            {% endif %}
-                        </td>
-                        <td class="text-end">
-                            {% if m.abono %}
-                                <span class="monto-positivo">${{ m.abono|floatformat:2|intcomma }}</span>
-                            {% else %}
-                                <span class="text-muted">-</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if not m.is_detalle %}
-                            <div class="acciones">
-                                <a href="{% url 'editar_movimiento' m.id %}" class="btn-edit">✏️</a>
-                                <a href="{% url 'eliminar_movimiento' m.id %}" class="btn-delete">🗑️</a>
-                            </div>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-                <tfoot style="background: #1e40af; color: white;">
-                    <tr>
-                        <th colspan="5" class="text-end">TOTALES:</th>
-                        <th class="text-end">${{ total_cargos|floatformat:2|intcomma }}</th>
-                        <th class="text-end">${{ total_abonos|floatformat:2|intcomma }}</th>
-                        <th class="text-end">Saldo: ${{ saldo|floatformat:2|intcomma }}</th>
-                    </tr>
-                </tfoot>
-            </table>
+                            </td>
+                            <td class="text-end">
+                                {% if m.abono %}
+                                    <span class="monto-positivo">${{ m.abono|floatformat:2|intcomma }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if not m.is_detalle %}
+                                <div class="acciones">
+                                    <a href="{% url 'editar_movimiento' m.id %}" class="btn-edit">✏️</a>
+                                    <a href="{% url 'eliminar_movimiento' m.id %}" class="btn-delete">🗑️</a>
+                                </div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot style="background: #1e40af; color: white;">
+                        <tr>
+                            <th colspan="5" class="text-end">TOTALES:</th>
+                            <th class="text-end" id="footerTotalCargos">${{ total_cargos|floatformat:2|intcomma }}</th>
+                            <th class="text-end" id="footerTotalAbonos">${{ total_abonos|floatformat:2|intcomma }}</th>
+                            <th class="text-end" id="footerSaldo">Saldo: ${{ saldo|floatformat:2|intcomma }}</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
             {% else %}
             <div class="empty-state">
                 <div style="font-size: 5rem;">💰</div>
@@ -540,15 +611,67 @@
     </div>
     
     <script>
-        // Filtro con Enter
-        document.getElementById('buscar').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                document.getElementById('filtrosForm').submit();
-            }
-        });
+        // ========== SELECTOR DE LÍMITE - RECARGA LA PÁGINA ==========
+        const selectorLimite = document.getElementById('selectorLimite');
+        if (selectorLimite) {
+            selectorLimite.addEventListener('change', function() {
+                const limit = this.value;
+                let url = window.location.pathname + '?limit=' + limit;
+                
+                // Mantener los filtros actuales
+                const params = new URLSearchParams(window.location.search);
+                params.forEach((value, key) => {
+                    if (key !== 'limit') {
+                        url += `&${key}=${encodeURIComponent(value)}`;
+                    }
+                });
+                
+                window.location.href = url;
+            });
+        }
         
-        // Auto-submit al cambiar cualquier filtro
+        // ========== EXPORTAR A EXCEL ==========
+        function exportarExcel() {
+            let csv = [];
+            
+            // Cabeceras
+            let cabeceras = [];
+            document.querySelectorAll('#tablaMovimientos thead th').forEach(th => {
+                if (th.innerText !== 'Acciones') {
+                    cabeceras.push('"' + th.innerText.replace(/"/g, '""') + '"');
+                }
+            });
+            csv.push(cabeceras.join(','));
+            
+            // Filas
+            document.querySelectorAll('#tablaMovimientosBody tr').forEach(fila => {
+                let filaData = [];
+                for (let i = 0; i < fila.cells.length - 1; i++) {
+                    let texto = fila.cells[i].innerText.trim().replace(/"/g, '""');
+                    filaData.push('"' + texto + '"');
+                }
+                csv.push(filaData.join(','));
+            });
+            
+            const blob = new Blob(["\ufeff" + csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'movimientos_' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.csv';
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+        
+        // ========== AUTO-SUBMIT DE FILTROS ==========
+        const buscarInput = document.getElementById('buscar');
+        if (buscarInput) {
+            buscarInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    document.getElementById('filtrosForm').submit();
+                }
+            });
+        }
+        
         const filtroTipo = document.getElementById('filtro-tipo');
         const filtroPersona = document.getElementById('filtro-persona');
         const filtroTarjeta = document.getElementById('filtro-tarjeta');
@@ -560,10 +683,6 @@
         if (filtroTarjeta) filtroTarjeta.addEventListener('change', function() { document.getElementById('filtrosForm').submit(); });
         if (fechaDesde) fechaDesde.addEventListener('change', function() { document.getElementById('filtrosForm').submit(); });
         if (fechaHasta) fechaHasta.addEventListener('change', function() { document.getElementById('filtrosForm').submit(); });
-        
-        function exportarExcel() {
-            window.location.href = "{% url 'exportar_excel' %}";
-        }
     </script>
 </body>
 </html>

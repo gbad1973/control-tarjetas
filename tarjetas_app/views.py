@@ -357,6 +357,9 @@ def lista_establecimientos(request):
 def lista_movimientos(request):
     from django.db.models import Prefetch, Sum, Q
     
+    # ========== LEER PARÁMETRO DE LÍMITE ==========
+    limit = request.GET.get('limit', '50')  # ← CORREGIDO: ahora se llama 'limit'
+    
     # Obtener pagos con sus compras
     pagos = Movimiento.objects.filter(tipo='PAGO').prefetch_related(
         Prefetch('pagos_a_compras', queryset=PagoCompra.objects.select_related('compra'))
@@ -429,7 +432,7 @@ def lista_movimientos(request):
         for pc in pago.pagos_a_compras.all():
             movimientos_final.append({
                 'id': pc.compra.id,
-                'fecha': pago.fecha,  # Misma fecha del pago
+                'fecha': pago.fecha,
                 'descripcion': f"↳ {pc.compra.descripcion} (Aplicado: ${pc.monto_aplicado:.2f})",
                 'cargo': pc.monto_aplicado,
                 'abono': None,
@@ -442,7 +445,7 @@ def lista_movimientos(request):
                 'suborden': 1
             })
     
-    # ORDENAR: Por fecha, luego por grupo, luego por suborden
+    # ORDENAR
     movimientos_final.sort(key=lambda x: (
         str(x['fecha']),
         x.get('grupo', x['id']),
@@ -489,37 +492,33 @@ def lista_movimientos(request):
         movimientos_filtrados = [m for m in movimientos_filtrados 
                                 if m['fecha'] and str(m['fecha']) <= fecha_hasta]
     
-    #personas = Persona.objects.filter(activo=True)
-    #tarjetas = Tarjeta.objects.filter(activa=True)
-    
-    #return render(request, 'tarjetas_app/lista_movimientos.html', {
-    #    'movimientos': movimientos_filtrados,
-    #    'personas': personas,
-    #    'tarjetas': tarjetas,
-    #    'total_cargos': total_cargos,
-    #    'total_abonos': total_abonos,
-    #    'saldo': saldo,
-    #})
-     
-    paginator = Paginator(movimientos_filtrados, 1000)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    # ========== APLICAR LÍMITE ==========
+    if limit == 'todos':
+        movimientos_mostrar = movimientos_filtrados
+        limite_usado = 'todos'
+    else:
+        try:
+            limit_int = int(limit)
+            movimientos_mostrar = movimientos_filtrados[:limit_int]
+            limite_usado = limit_int
+        except ValueError:
+            movimientos_mostrar = movimientos_filtrados[:50]
+            limite_usado = 50
     
     personas = Persona.objects.filter(activo=True)
     tarjetas = Tarjeta.objects.filter(activa=True)
     
-    return render(request, 'tarjetas_app/lista_movimientos.html', {
-        'movimientos': page_obj,  # ← Solo cambia esto, de movimientos_filtrados a page_obj
+    context = {
+        'movimientos': movimientos_mostrar,
         'personas': personas,
         'tarjetas': tarjetas,
         'total_cargos': total_cargos,
         'total_abonos': total_abonos,
         'saldo': saldo,
-    }) 
-   
-   
-   
-   
+        'limite_actual': limite_usado,  # ← CORREGIDO: ahora usa limite_usado
+        'total_movimientos_filtrados': len(movimientos_filtrados),
+    }
+    return render(request, 'tarjetas_app/lista_movimientos.html', context)
    
 # ========== EDITAR Y ELIMINAR ==========
 @login_required

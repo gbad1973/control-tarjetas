@@ -1,3 +1,5 @@
+<
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -44,9 +46,34 @@
         .total-abonos { color: #10b981; font-size: 1.3rem; font-weight: 700; }
         .total-saldo { color: #4f46e5; font-size: 1.3rem; font-weight: 700; }
         
-        .tabla-container { overflow-x: auto; margin-top: 15px; border-radius: 10px; border: 1px solid #e5e7eb; }
+        /* ========== NUEVO: CONTENEDOR CON SCROLL ========== */
+        .tabla-container { 
+            overflow-x: auto; 
+            overflow-y: auto;
+            max-height: 550px;
+            border-radius: 10px; 
+            border: 1px solid #e5e7eb;
+        }
+        
+        /* Scrollbar bonito */
+        .tabla-container::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        .tabla-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .tabla-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        .tabla-container::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
         table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        th { background: #1e40af; color: white; padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e3a8a; }
+        th { background: #1e40af; color: white; padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e3a8a; position: sticky; top: 0; z-index: 10; }
         td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; }
         tr:hover { background: #f1f5f9; }
         .badge { padding: 4px 10px; border-radius: 16px; font-size: 0.7rem; font-weight: 600; display: inline-block; }
@@ -57,21 +84,44 @@
         .text-right { text-align: right; }
         .compra-row { background-color: #f9fafc; font-weight: 500; border-top: 2px solid #4f46e5; }
         .pago-row { background-color: #ffffff; }
-        .pago-row td:first-child { padding-left: 30px; } /* Sangría para pagos */
+        .pago-row td:first-child { padding-left: 30px; }
         .pago-row td { color: #059669; }
         
         .acciones { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap; }
+        
+        /* Selector de límite */
+        .limite-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f8fafc;
+            padding: 8px 15px;
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+        }
+        .limite-selector label {
+            font-weight: 600;
+            color: #4f46e5;
+            font-size: 0.85rem;
+        }
+        .limite-selector select {
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 2px solid #e5e7eb;
+            background: white;
+            cursor: pointer;
+        }
         
         /* Estilos de impresión */
         @media print {
             @page { size: landscape; margin: 1cm; }
             body { background: white; padding: 0; }
             .container { box-shadow: none; padding: 10px; max-width: 100%; }
-            .btn, .acciones, .filtros, .resumen, .header a, [class*="btn"] { display: none !important; }
+            .btn, .acciones, .filtros, .resumen, .header a, [class*="btn"], .limite-selector { display: none !important; }
             .header h1 { display: block !important; font-size: 14pt; color: black; margin-bottom: 15px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
-            .tabla-container { display: block !important; border: none; overflow: visible; }
+            .tabla-container { display: block !important; border: none; overflow: visible; max-height: none; }
             table { font-size: 9pt; width: 100%; border-collapse: collapse; page-break-inside: auto; }
-            th { background: #f0f0f0 !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 6px; }
+            th { background: #f0f0f0 !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 6px; position: static; }
             td { padding: 4px 6px; border-bottom: 1px solid #ddd; }
             thead { display: table-header-group; }
             tfoot { display: table-footer-group; }
@@ -168,10 +218,22 @@
             </div>
         </div>
         
-        <!-- BOTONES DE EXPORTACIÓN -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <!-- BOTONES DE EXPORTACIÓN Y SELECTOR DE LÍMITE -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
             <h2 style="color: #1f2937; font-size: 1rem; font-weight: 600;">📋 Compras y Pagos</h2>
             <div style="display: flex; gap: 8px;">
+                <div class="limite-selector">
+                    <label>📊 Mostrar:</label>
+                    <select id="selectorLimite">
+                        <option value="20">20 movimientos</option>
+                        <option value="50" selected>50 movimientos</option>
+                        <option value="100">100 movimientos</option>
+                        <option value="200">200 movimientos</option>
+                        <option value="500">500 movimientos</option>
+                        <option value="1000">1000 movimientos</option>
+                        <option value="todos">Todos los movimientos</option>
+                    </select>
+                </div>
                 <button onclick="exportarExcel()" class="btn btn-success" type="button">
                     📊 Excel
                 </button>
@@ -197,10 +259,10 @@
                         <th class="text-right">Saldo</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="tablaMovimientosBody">
                     {% for compra in compras %}
                     <!-- Fila de la compra -->
-                    <tr class="compra-row">
+                    <tr class="compra-row" data-tipo="compra">
                         <td>{{ compra.fecha|date:"d/m/Y" }}</td>
                         <td>{{ compra.persona.nombre }}</td>
                         <td>{{ compra.tarjeta.banco }}</td>
@@ -219,7 +281,7 @@
                     </tr>
                     <!-- Pagos asociados a esta compra -->
                     {% for pago_compra in compra.pagos_ordenados %}
-                    <tr class="pago-row">
+                    <tr class="pago-row" data-tipo="pago">
                         <td>{{ pago_compra.pago.fecha|date:"d/m/Y" }}</td>
                         <td>{{ pago_compra.pago.persona.nombre }}</td>
                         <td>{{ pago_compra.pago.tarjeta.banco }}</td>
@@ -252,7 +314,7 @@
                         </td>
                     </tr>
                     {% for pago in pagos_sin_asignar %}
-                    <tr class="pago-row">
+                    <tr class="pago-row" data-tipo="pago_sin_asignar">
                         <td>{{ pago.fecha|date:"d/m/Y" }}</td>
                         <td>{{ pago.persona.nombre }}</td>
                         <td>{{ pago.tarjeta.banco }}</td>
@@ -295,7 +357,7 @@
         // Calcular totales
         function calcularTotales() {
             let totalCargos = 0, totalAbonos = 0, saldo = 0;
-            const filas = document.querySelectorAll('#tablaMovimientos tbody tr');
+            const filas = document.querySelectorAll('#tablaMovimientosBody tr');
             filas.forEach(fila => {
                 if (fila.cells.length === 1) return; // saltar filas de separación
                 const cargoCelda = fila.cells[6];
@@ -324,15 +386,57 @@
             document.getElementById('totalSaldoColumna').textContent = formatearMoneda(saldo);
         }
         
+        // ========== NUEVO: FILTRAR POR LÍMITE ==========
+        function aplicarLimite() {
+            const selector = document.getElementById('selectorLimite');
+            const limit = selector.value;
+            const todasFilas = document.querySelectorAll('#tablaMovimientosBody tr');
+            
+            // Ocultar todas las filas primero
+            todasFilas.forEach(fila => {
+                fila.style.display = '';
+            });
+            
+            if (limit === 'todos') {
+                // Mostrar todas
+                todasFilas.forEach(fila => {
+                    fila.style.display = '';
+                });
+            } else {
+                const limiteNum = parseInt(limit);
+                let contador = 0;
+                todasFilas.forEach(fila => {
+                    if (contador < limiteNum) {
+                        fila.style.display = '';
+                        contador++;
+                    } else {
+                        fila.style.display = 'none';
+                    }
+                });
+            }
+            
+            // Recalcular totales después de filtrar
+            calcularTotales();
+        }
+        
+        // Configurar el selector de límite
+        const selectorLimite = document.getElementById('selectorLimite');
+        if (selectorLimite) {
+            selectorLimite.addEventListener('change', aplicarLimite);
+        }
+        
         // EXPORTAR A EXCEL
         function exportarExcel() {
             let datos = [];
             let encabezados = ['Fecha', 'Persona', 'Tarjeta', 'Tipo', 'Establecimiento', 'Descripción', 'Cargo', 'Abono', 'Saldo'];
             datos.push(encabezados.join(','));
 
-            let filas = document.querySelectorAll('#tablaMovimientos tbody tr');
+            let filas = document.querySelectorAll('#tablaMovimientosBody tr');
             filas.forEach(fila => {
                 if (fila.cells.length === 1) return;
+                // Solo exportar filas visibles
+                if (fila.style.display === 'none') return;
+                
                 let filaDatos = [];
                 for (let i = 0; i <= 5; i++) {
                     filaDatos.push(`"${fila.cells[i].textContent.trim()}"`);
@@ -374,7 +478,10 @@
             return false;
         }
         
-        window.onload = calcularTotales;
+        window.onload = function() {
+            calcularTotales();
+            aplicarLimite(); // Aplicar límite inicial
+        };
     </script>
 </body>
 </html>
