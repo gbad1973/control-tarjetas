@@ -13,12 +13,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECRET_KEY
 SECRET_KEY = config('SECRET_KEY', default='reemplaza-esto-en-produccion')
-
 # DEBUG
 DEBUG = config('DEBUG', default=False, cast=bool)
-
 # ALLOWED_HOSTS
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="*", cast=Csv())
+
+# Seguridad
+#SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'tu-clave-secreta-local')
+#DEBUG = os.environ.get('DEBUG', 'False') == 'True'  # ← Importante
+#ALLOWED_HOSTS = ['*']  # ← Temporal para pruebas, después puedes poner tu dominio de Render
+
+
+
 
 CSRF_TRUSTED_ORIGINS = ['https://control-tarjetas.onrender.com']
 
@@ -77,6 +83,7 @@ DATABASES = {
     )
 }
 
+
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -92,10 +99,18 @@ USE_I18N = True
 USE_TZ = True
 
 # Archivos estáticos
+#STATIC_URL = '/static/'
+#STATIC_ROOT = BASE_DIR / "staticfiles"
+#STATICFILES_DIRS = [BASE_DIR / 'static']
+#STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+
 STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+
 
 # Archivos de medios
 MEDIA_URL = '/media/'
@@ -119,3 +134,14 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+
+
+# CSRF para Render
+CSRF_TRUSTED_ORIGINS = [
+    'https://control-tarjetas.onrender.com',
+    'http://control-tarjetas.onrender.com',
+]
+
+# Asegurar cookies
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
