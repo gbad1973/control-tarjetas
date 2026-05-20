@@ -357,6 +357,22 @@ def lista_establecimientos(request):
 def lista_movimientos(request):
     from django.db.models import Prefetch, Sum, Q
     
+    import traceback
+    import sys
+    try:
+        # TODO: El resto de tu código existente aquí
+        print("=== INICIO DE lista_movimientos ===")
+        
+        # ... (aquí va todo tu código actual de lista_movimientos)
+        
+        print("=== FIN DE lista_movimientos ===")
+    except Exception as e:
+        print("❌ ERROR EN lista_movimientos:")
+        traceback.print_exc()
+        # En lugar de error 500, mostrar el error en la página
+        return render(request, 'tarjetas_app/error.html', {'error': str(e), 'traceback': traceback.format_exc()})
+    
+    
     # ========== LEER PARÁMETRO DE LÍMITE ==========
     limit = request.GET.get('limit', '50')  # ← CORREGIDO: ahora se llama 'limit'
     
