@@ -650,22 +650,30 @@ def api_personas_tarjeta(request, tarjeta_id):
 
 @login_required
 def detalle_persona(request, persona_id):
-    from django.db.models import Sum, Q
+    from django.db.models import Sum
     from decimal import Decimal
     import traceback
     from django.http import HttpResponse
     
     try:
+        print("=== INICIANDO detalle_persona ===")
+        
         persona = get_object_or_404(Persona, id=persona_id)
+        print(f"Persona encontrada: {persona.nombre}")
+        
         tarjetas = Tarjeta.objects.filter(usuarios=persona)
         tarjeta_id = request.GET.get('tarjeta')
         fecha_desde = request.GET.get('fecha_desde')
         fecha_hasta = request.GET.get('fecha_hasta')
         
+        print(f"Filtros: tarjeta_id={tarjeta_id}, desde={fecha_desde}, hasta={fecha_hasta}")
+        
         # Consulta base de movimientos filtrados
         movimientos_qs = Movimiento.objects.filter(
             persona=persona
         ).select_related('tarjeta', 'establecimiento').order_by('-fecha')
+        
+        print(f"Movimientos totales: {movimientos_qs.count()}")
         
         if tarjeta_id:
             movimientos_qs = movimientos_qs.filter(tarjeta_id=tarjeta_id)
@@ -673,6 +681,8 @@ def detalle_persona(request, persona_id):
             movimientos_qs = movimientos_qs.filter(fecha__gte=fecha_desde)
         if fecha_hasta:
             movimientos_qs = movimientos_qs.filter(fecha__lte=fecha_hasta)
+        
+        print(f"Movimientos después de filtros: {movimientos_qs.count()}")
         
         # Separar movimientos por tipo
         compras = []
@@ -684,7 +694,7 @@ def detalle_persona(request, persona_id):
                 # Calcular saldo pendiente de compra
                 pagado = PagoCompra.objects.filter(compra=m).aggregate(total=Sum('monto_aplicado'))['total'] or 0
                 saldo = m.monto - pagado
-                if saldo > 0.01:  # Solo mostrar si tiene saldo pendiente
+                if saldo > 0.01:
                     compras.append({
                         'tipo': 'COMPRA_PENDIENTE',
                         'id': m.id,
@@ -712,7 +722,6 @@ def detalle_persona(request, persona_id):
                         'cashback': m.monto_cashback,
                     })
             elif m.tipo == 'PAGO':
-                # Obtener compras pagadas con este pago
                 detalles = []
                 for pc in PagoCompra.objects.filter(pago=m).select_related('compra'):
                     detalles.append({
@@ -740,6 +749,8 @@ def detalle_persona(request, persona_id):
         movimientos_agrupados = compras + mensualidades + pagos
         movimientos_agrupados.sort(key=lambda x: x.get('fecha', date.min), reverse=True)
         
+        print(f"Movimientos agrupados: {len(movimientos_agrupados)}")
+        
         # Compras a meses (para botón de cargar mensualidad)
         compras_meses = Movimiento.objects.filter(
             persona=persona,
@@ -754,6 +765,8 @@ def detalle_persona(request, persona_id):
         if tarjeta_id:
             tarjeta_seleccionada = get_object_or_404(Tarjeta, id=tarjeta_id)
         
+        print("=== detalle_persona completado exitosamente ===")
+        
         context = {
             'persona': persona,
             'tarjetas': tarjetas,
@@ -764,9 +777,9 @@ def detalle_persona(request, persona_id):
         return render(request, 'tarjetas_app/detalle_persona.html', context)
     
     except Exception as e:
+        print(f"❌ ERROR: {str(e)}")
+        traceback.print_exc()
         return HttpResponse(f"Error en detalle_persona: {str(e)}<br><br><pre>{traceback.format_exc()}</pre>")
-
-
 
 # **************************************************************************
 @login_required
