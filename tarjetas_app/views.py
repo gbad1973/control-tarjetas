@@ -19,6 +19,9 @@ from django.core.paginator import Paginator
 import csv
 from django.http import HttpResponse
 
+
+print("=== ARCHIVO views.py CARGADO CORRECTAMENTE ===")
+
 # ========== AUTENTICACIÓN ==========
 def login_view(request):
     if request.method == 'POST':
@@ -360,6 +363,10 @@ def lista_movimientos(request):
     import traceback
     import sys
     try:
+        
+        print("=== ENTRANDO A lista_movimientos ===")
+        print(f"Usuario: {request.user}")
+    
         # TODO: El resto de tu código existente aquí
         print("=== INICIO DE lista_movimientos ===")
         
@@ -534,6 +541,7 @@ def lista_movimientos(request):
         'limite_actual': limite_usado,  # ← CORREGIDO: ahora usa limite_usado
         'total_movimientos_filtrados': len(movimientos_filtrados),
     }
+    print("=== Saliendo de lista_movimientos, todo OK ===")
     return render(request, 'tarjetas_app/lista_movimientos.html', context)
    
 # ========== EDITAR Y ELIMINAR ==========
