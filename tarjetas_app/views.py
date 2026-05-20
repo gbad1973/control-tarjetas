@@ -650,136 +650,138 @@ def api_personas_tarjeta(request, tarjeta_id):
 
 @login_required
 def detalle_persona(request, persona_id):
-    from django.db.models import Sum
+    from django.db.models import Sum, Prefetch
     from decimal import Decimal
-    import traceback
-    from django.http import HttpResponse
     
-    try:
-        print("=== INICIANDO detalle_persona ===")
-        
-        persona = get_object_or_404(Persona, id=persona_id)
-        print(f"Persona encontrada: {persona.nombre}")
-        
-        tarjetas = Tarjeta.objects.filter(usuarios=persona)
-        tarjeta_id = request.GET.get('tarjeta')
-        fecha_desde = request.GET.get('fecha_desde')
-        fecha_hasta = request.GET.get('fecha_hasta')
-        
-        print(f"Filtros: tarjeta_id={tarjeta_id}, desde={fecha_desde}, hasta={fecha_hasta}")
-        
-        # Consulta base de movimientos filtrados
-        movimientos_qs = Movimiento.objects.filter(
-            persona=persona
-        ).select_related('tarjeta', 'establecimiento').order_by('-fecha')
-        
-        print(f"Movimientos totales: {movimientos_qs.count()}")
-        
-        if tarjeta_id:
-            movimientos_qs = movimientos_qs.filter(tarjeta_id=tarjeta_id)
-        if fecha_desde:
-            movimientos_qs = movimientos_qs.filter(fecha__gte=fecha_desde)
-        if fecha_hasta:
-            movimientos_qs = movimientos_qs.filter(fecha__lte=fecha_hasta)
-        
-        print(f"Movimientos después de filtros: {movimientos_qs.count()}")
-        
-        # Separar movimientos por tipo
-        compras = []
-        mensualidades = []
-        pagos = []
-        
-        for m in movimientos_qs:
-            if m.tipo == 'COMPRA' and not m.es_a_meses:
-                # Calcular saldo pendiente de compra
-                pagado = PagoCompra.objects.filter(compra=m).aggregate(total=Sum('monto_aplicado'))['total'] or 0
-                saldo = m.monto - pagado
-                if saldo > 0.01:
-                    compras.append({
-                        'tipo': 'COMPRA_PENDIENTE',
-                        'id': m.id,
-                        'fecha': m.fecha,
-                        'descripcion': m.descripcion,
-                        'monto': m.monto,
-                        'saldo': saldo,
-                        'tarjeta': m.tarjeta,
-                        'establecimiento': m.establecimiento.nombre if m.establecimiento else '',
-                        'cashback': m.monto_cashback,
-                    })
-            elif m.tipo == 'MENSUALIDAD':
-                pagado = PagoCompra.objects.filter(compra=m).aggregate(total=Sum('monto_aplicado'))['total'] or 0
-                saldo = m.monto - pagado
-                if saldo > 0.01:
-                    mensualidades.append({
-                        'tipo': 'MENSUALIDAD',
-                        'id': m.id,
-                        'fecha': m.fecha,
-                        'descripcion': m.descripcion,
-                        'monto': m.monto,
-                        'saldo': saldo,
-                        'tarjeta': m.tarjeta,
-                        'establecimiento': m.establecimiento.nombre if m.establecimiento else '',
-                        'cashback': m.monto_cashback,
-                    })
-            elif m.tipo == 'PAGO':
-                detalles = []
-                for pc in PagoCompra.objects.filter(pago=m).select_related('compra'):
-                    detalles.append({
-                        'tipo': 'COMPRA_PAGADA',
-                        'id': pc.compra.id,
-                        'descripcion': pc.compra.descripcion,
-                        'monto': pc.monto_aplicado,
-                        'tarjeta': pc.compra.tarjeta,
-                        'establecimiento': pc.compra.establecimiento.nombre if pc.compra.establecimiento else '',
-                        'cashback': pc.compra.monto_cashback,
-                        'fecha': pc.compra.fecha,
-                    })
-                
-                pagos.append({
-                    'tipo': 'PAGO',
-                    'id': m.id,
-                    'fecha': m.fecha,
-                    'descripcion': m.descripcion,
-                    'monto': m.monto,
-                    'tarjeta': m.tarjeta,
-                    'detalles': detalles,
-                })
-        
-        # Combinar y ordenar por fecha
-        movimientos_agrupados = compras + mensualidades + pagos
-        movimientos_agrupados.sort(key=lambda x: x.get('fecha', date.min), reverse=True)
-        
-        print(f"Movimientos agrupados: {len(movimientos_agrupados)}")
-        
-        # Compras a meses (para botón de cargar mensualidad)
-        compras_meses = Movimiento.objects.filter(
-            persona=persona,
-            tipo='COMPRA',
-            es_a_meses=True
-        ).order_by('fecha')
-        
-        if tarjeta_id:
-            compras_meses = compras_meses.filter(tarjeta_id=tarjeta_id)
-        
-        tarjeta_seleccionada = None
-        if tarjeta_id:
-            tarjeta_seleccionada = get_object_or_404(Tarjeta, id=tarjeta_id)
-        
-        print("=== detalle_persona completado exitosamente ===")
-        
-        context = {
-            'persona': persona,
-            'tarjetas': tarjetas,
-            'tarjeta_seleccionada': tarjeta_seleccionada,
-            'movimientos_agrupados': movimientos_agrupados,
-            'compras_meses': compras_meses,
+    persona = get_object_or_404(Persona, id=persona_id)
+    tarjetas = Tarjeta.objects.filter(usuarios=persona)
+    tarjeta_id = request.GET.get('tarjeta')
+    fecha_desde = request.GET.get('fecha_desde')
+    fecha_hasta = request.GET.get('fecha_hasta')
+    
+    # Obtener todas las compras de la persona (excluyendo compras a meses)
+    compras = Movimiento.objects.filter(
+        persona=persona,
+        tipo='COMPRA',
+        es_a_meses=False
+    ).select_related('tarjeta', 'establecimiento').order_by('fecha')
+    
+    # Obtener todas las mensualidades de la persona
+    mensualidades = Movimiento.objects.filter(
+        persona=persona,
+        tipo='MENSUALIDAD'
+    ).select_related('tarjeta', 'establecimiento').order_by('fecha')
+    
+    # Obtener todos los pagos de la persona con sus relaciones
+    pagos = Movimiento.objects.filter(
+        persona=persona,
+        tipo='PAGO'
+    ).prefetch_related(
+        Prefetch('pagos_a_compras', queryset=PagoCompra.objects.select_related('compra'))
+    ).select_related('tarjeta').order_by('fecha')
+    
+    # Aplicar filtros
+    if tarjeta_id:
+        compras = compras.filter(tarjeta_id=tarjeta_id)
+        mensualidades = mensualidades.filter(tarjeta_id=tarjeta_id)
+        pagos = pagos.filter(tarjeta_id=tarjeta_id)
+    if fecha_desde:
+        compras = compras.filter(fecha__gte=fecha_desde)
+        mensualidades = mensualidades.filter(fecha__gte=fecha_desde)
+        pagos = pagos.filter(fecha__gte=fecha_desde)
+    if fecha_hasta:
+        compras = compras.filter(fecha__lte=fecha_hasta)
+        mensualidades = mensualidades.filter(fecha__lte=fecha_hasta)
+        pagos = pagos.filter(fecha__lte=fecha_hasta)
+    
+    # Construir lista de movimientos
+    movimientos = []
+    
+    # PRIMERO: Agregar compras con saldo pendiente
+    for compra in compras:
+        total_pagado = compra.pagos_recibidos.aggregate(total=Sum('monto_aplicado'))['total'] or 0
+        saldo = compra.monto - total_pagado
+        if saldo > 0:
+            movimientos.append({
+                'tipo': 'COMPRA_PENDIENTE',
+                'id': compra.id,
+                'fecha': compra.fecha,
+                'descripcion': compra.descripcion,
+                'monto': compra.monto,
+                'saldo': saldo,
+                'tarjeta': compra.tarjeta,
+                'establecimiento': compra.establecimiento.nombre if compra.establecimiento else '',
+                'cashback': compra.monto_cashback,
+            })
+    
+    # SEGUNDO: Agregar mensualidades con saldo pendiente
+    for m in mensualidades:
+        pagado = m.pagos_recibidos.aggregate(total=Sum('monto_aplicado'))['total'] or 0
+        saldo = m.monto - pagado
+        if saldo > 0:
+            movimientos.append({
+                'tipo': 'MENSUALIDAD',
+                'id': m.id,
+                'fecha': m.fecha,
+                'descripcion': m.descripcion,
+                'monto': m.monto,
+                'saldo': saldo,
+                'tarjeta': m.tarjeta,
+                'establecimiento': m.establecimiento.nombre if m.establecimiento else '',
+                'cashback': m.monto_cashback,
+            })
+    
+    # TERCERO: Agregar pagos con sus compras pagadas
+    for pago in pagos:
+        item_pago = {
+            'tipo': 'PAGO',
+            'id': pago.id,
+            'fecha': pago.fecha,
+            'descripcion': pago.descripcion,
+            'monto': pago.monto,
+            'tarjeta': pago.tarjeta,
+            'detalles': []
         }
-        return render(request, 'tarjetas_app/detalle_persona.html', context)
+        
+        for pc in pago.pagos_a_compras.all():
+            item_pago['detalles'].append({
+                'tipo': 'COMPRA_PAGADA',
+                'id': pc.compra.id,
+                'descripcion': pc.compra.descripcion,
+                'monto': pc.monto_aplicado,
+                'monto_aplicado': pc.monto_aplicado,
+                'tarjeta': pc.compra.tarjeta,
+                'establecimiento': pc.compra.establecimiento.nombre if pc.compra.establecimiento else '',
+                'cashback': pc.compra.monto_cashback,
+                'fecha': pc.compra.fecha,
+            })
+        
+        movimientos.append(item_pago)
     
-    except Exception as e:
-        print(f"❌ ERROR: {str(e)}")
-        traceback.print_exc()
-        return HttpResponse(f"Error en detalle_persona: {str(e)}<br><br><pre>{traceback.format_exc()}</pre>")
+    # Ordenar por fecha
+    movimientos.sort(key=lambda x: x['fecha'])
+    
+    compras_meses = Movimiento.objects.filter(
+        persona=persona,
+        tipo='COMPRA',
+        es_a_meses=True
+    ).order_by('fecha')
+    
+    if tarjeta_id:
+        compras_meses = compras_meses.filter(tarjeta_id=tarjeta_id)
+    
+    tarjeta_seleccionada = None
+    if tarjeta_id:
+        tarjeta_seleccionada = get_object_or_404(Tarjeta, id=tarjeta_id)
+    
+    context = {
+        'persona': persona,
+        'tarjetas': tarjetas,
+        'tarjeta_seleccionada': tarjeta_seleccionada,
+        'movimientos_agrupados': movimientos,
+        'compras_meses': compras_meses,
+    }
+    return render(request, 'tarjetas_app/detalle_persona.html', context)
 
 # **************************************************************************
 @login_required
