@@ -358,163 +358,90 @@ def lista_establecimientos(request):
 
 @login_required
 def lista_movimientos(request):
-    from django.db.models import Prefetch, Sum, Q
-    from django.core.paginator import Paginator
+    from django.db.models import Sum, Q
     from django.http import HttpResponse
+    from django.core.paginator import Paginator
+    import traceback
     
     try:
-        # Leer parámetro de límite
+        # Leer parámetros
         limit = request.GET.get('limit', '50')
+        buscar = request.GET.get('buscar', '')
+        tipo = request.GET.get('tipo', '')
+        persona_id = request.GET.get('persona', '')
+        tarjeta_id = request.GET.get('tarjeta', '')
+        fecha_desde = request.GET.get('fecha_desde', '')
+        fecha_hasta = request.GET.get('fecha_hasta', '')
         
-        # Obtener pagos con sus compras (con manejo de errores)
-        pagos = Movimiento.objects.filter(tipo='PAGO').select_related('persona', 'tarjeta').order_by('fecha', 'id')
+        # Consulta base: TODOS los movimientos con relaciones necesarias
+        movimientos_qs = Movimiento.objects.select_related('persona', 'tarjeta', 'establecimiento').order_by('-fecha')
         
-        # Obtener todas las compras
-        compras = Movimiento.objects.filter(tipo='COMPRA').select_related('persona', 'tarjeta')
+        # Aplicar filtros
+        if buscar:
+            movimientos_qs = movimientos_qs.filter(
+                Q(descripcion__icontains=buscar) | 
+                Q(persona__nombre__icontains=buscar) |
+                Q(tarjeta__banco__icontains=buscar)
+            )
+        if tipo:
+            movimientos_qs = movimientos_qs.filter(tipo=tipo)
+        if persona_id:
+            movimientos_qs = movimientos_qs.filter(persona_id=persona_id)
+        if tarjeta_id:
+            movimientos_qs = movimientos_qs.filter(tarjeta_id=tarjeta_id)
+        if fecha_desde:
+            movimientos_qs = movimientos_qs.filter(fecha__gte=fecha_desde)
+        if fecha_hasta:
+            movimientos_qs = movimientos_qs.filter(fecha__lte=fecha_hasta)
         
-        # Obtener todas las mensualidades
-        mensualidades = Movimiento.objects.filter(tipo='MENSUALIDAD').select_related('persona', 'tarjeta', 'establecimiento')
-        
-        # Crear lista de IDs de compras pagadas
-        compras_pagadas_ids = set(PagoCompra.objects.values_list('compra_id', flat=True))
-        
-        # Construir lista final
-        movimientos_final = []
-        
-        # PRIMERO: Compras NO pagadas (excluyendo compras a meses)
-        for compra in compras:
-            if compra.id not in compras_pagadas_ids and not compra.es_a_meses:
-                movimientos_final.append({
-                    'id': compra.id,
-                    'fecha': compra.fecha,
-                    'descripcion': compra.descripcion,
-                    'cargo': compra.monto,
-                    'abono': None,
-                    'persona': compra.persona,
-                    'tarjeta': compra.tarjeta,
-                    'tipo': 'COMPRA',
-                    'is_detalle': False,
-                    'monto_aplicado': None
-                })
-        
-        # SEGUNDO: Mensualidades
-        for m in mensualidades:
-            pagado = PagoCompra.objects.filter(compra=m).aggregate(total=Sum('monto_aplicado'))['total'] or 0
-            saldo = m.monto - pagado
-            if saldo > 0:
-                movimientos_final.append({
-                    'id': m.id,
-                    'fecha': m.fecha,
-                    'descripcion': m.descripcion,
-                    'cargo': saldo,
-                    'abono': None,
-                    'persona': m.persona,
-                    'tarjeta': m.tarjeta,
-                    'tipo': 'MENSUALIDAD',
-                    'is_detalle': False,
-                    'monto_aplicado': None
-                })
-        
-        # TERCERO: Pagos con sus compras
-        for pago in pagos:
-            # Pago principal
-            movimientos_final.append({
-                'id': pago.id,
-                'fecha': pago.fecha,
-                'descripcion': pago.descripcion,
-                'cargo': None,
-                'abono': pago.monto,
-                'persona': pago.persona,
-                'tarjeta': pago.tarjeta,
-                'tipo': 'PAGO',
-                'is_detalle': False,
-                'monto_aplicado': None,
-                'grupo': pago.id
-            })
-            
-            # Detalles de compras pagadas
-            detalles = PagoCompra.objects.filter(pago=pago).select_related('compra')
-            for pc in detalles:
-                movimientos_final.append({
-                    'id': pc.compra.id,
-                    'fecha': pago.fecha,
-                    'descripcion': f"↳ {pc.compra.descripcion} (Aplicado: ${pc.monto_aplicado:.2f})",
-                    'cargo': pc.monto_aplicado,
-                    'abono': None,
-                    'persona': pc.compra.persona,
-                    'tarjeta': pc.compra.tarjeta,
-                    'tipo': 'COMPRA_PAGADA',
-                    'is_detalle': True,
-                    'monto_aplicado': pc.monto_aplicado,
-                    'grupo': pago.id,
-                    'suborden': 1
-                })
-        
-        # ORDENAR
-        movimientos_final.sort(key=lambda x: (str(x.get('fecha', '1900-01-01')), x.get('grupo', x.get('id', 0)), x.get('suborden', 0)))
-        
-        # Calcular totales
-        total_cargos = sum(m.get('cargo', 0) for m in movimientos_final if m.get('cargo') and not m.get('is_detalle'))
-        total_abonos = sum(m.get('abono', 0) for m in movimientos_final if m.get('abono'))
-        saldo = total_cargos - total_abonos
-        
-        # Filtrar por búsqueda
-        buscar = request.GET.get('buscar')
-        tipo = request.GET.get('tipo')
-        persona_id = request.GET.get('persona')
-        tarjeta_id = request.GET.get('tarjeta')
-        fecha_desde = request.GET.get('fecha_desde')
-        fecha_hasta = request.GET.get('fecha_hasta')
-        
-        movimientos_filtrados = []
-        for m in movimientos_final:
-            incluir = True
-            if buscar and buscar.lower() not in m.get('descripcion', '').lower() and (not m.get('persona') or buscar.lower() not in m['persona'].nombre.lower()):
-                incluir = False
-            if incluir and tipo and tipo != '' and m.get('tipo') != tipo:
-                incluir = False
-            if incluir and persona_id and persona_id != '' and (not m.get('persona') or str(m['persona'].id) != persona_id):
-                incluir = False
-            if incluir and tarjeta_id and tarjeta_id != '' and (not m.get('tarjeta') or str(m['tarjeta'].id) != tarjeta_id):
-                incluir = False
-            if incluir and fecha_desde and m.get('fecha') and str(m['fecha']) < fecha_desde:
-                incluir = False
-            if incluir and fecha_hasta and m.get('fecha') and str(m['fecha']) > fecha_hasta:
-                incluir = False
-            if incluir:
-                movimientos_filtrados.append(m)
+        # Contar total para el paginador
+        total_movimientos = movimientos_qs.count()
         
         # Aplicar límite
         if limit == 'todos':
-            movimientos_mostrar = movimientos_filtrados
-            limite_usado = 'todos'
+            movimientos_paginados = movimientos_qs
         else:
             try:
                 limit_int = int(limit)
-                movimientos_mostrar = movimientos_filtrados[:limit_int]
-                limite_usado = limit_int
+                paginator = Paginator(movimientos_qs, limit_int)
+                page_number = request.GET.get('page', 1)
+                movimientos_paginados = paginator.get_page(page_number)
             except:
-                movimientos_mostrar = movimientos_filtrados[:50]
-                limite_usado = 50
+                movimientos_paginados = movimientos_qs[:50]
+        
+        # Calcular totales (solo si hay movimientos)
+        total_cargos = 0
+        total_abonos = 0
+        saldo = 0
+        
+        if total_movimientos > 0:
+            total_cargos = movimientos_qs.filter(
+                tipo__in=['COMPRA', 'MENSUALIDAD', 'COMISION', 'INTERES']
+            ).aggregate(total=Sum('monto'))['total'] or 0
+            
+            total_abonos = movimientos_qs.filter(
+                tipo='PAGO'
+            ).aggregate(total=Sum('monto'))['total'] or 0
+            
+            saldo = total_cargos - total_abonos
         
         personas = Persona.objects.filter(activo=True)
         tarjetas = Tarjeta.objects.filter(activa=True)
         
         context = {
-            'movimientos': movimientos_mostrar,
+            'movimientos': movimientos_paginados,
             'personas': personas,
             'tarjetas': tarjetas,
             'total_cargos': total_cargos,
             'total_abonos': total_abonos,
             'saldo': saldo,
-            'limite_actual': limite_usado,
-            'total_movimientos_filtrados': len(movimientos_filtrados),
+            'limite_actual': limit if limit == 'todos' else int(limit) if limit.isdigit() else 50,
+            'total_movimientos_filtrados': total_movimientos,
         }
         return render(request, 'tarjetas_app/lista_movimientos.html', context)
     
     except Exception as e:
-        import traceback
-        return HttpResponse(f"Error en lista_movimientos: {str(e)}<br><br><pre>{traceback.format_exc()}</pre>")
+        return HttpResponse(f"ERROR: {str(e)}<br><br><pre>{traceback.format_exc()}</pre>")
 
 
    
