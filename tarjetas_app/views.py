@@ -744,17 +744,18 @@ def detalle_persona(request, persona_id):
         }
         
         for pc in pago.pagos_a_compras.all():
-            item_pago['detalles'].append({
-                'tipo': 'COMPRA_PAGADA',
-                'id': pc.compra.id,
-                'descripcion': pc.compra.descripcion,
-                'monto': pc.monto_aplicado,
-                'monto_aplicado': pc.monto_aplicado,
-                'tarjeta': pc.compra.tarjeta,
-                'establecimiento': pc.compra.establecimiento.nombre if pc.compra.establecimiento else '',
-                'cashback': pc.compra.monto_cashback,
-                'fecha': pc.compra.fecha,
-            })
+            if pc.compra:  # Verificar que la compra existe
+                item_pago['detalles'].append({
+                    'tipo': 'COMPRA_PAGADA',
+                    'id': pc.compra.id,
+                    'descripcion': pc.compra.descripcion,
+                    'monto': pc.monto_aplicado,
+                    'monto_aplicado': pc.monto_aplicado,
+                    'tarjeta': pc.compra.tarjeta,
+                    'establecimiento': pc.compra.establecimiento.nombre if pc.compra.establecimiento else '',
+                    'cashback': pc.compra.monto_cashback,
+                    'fecha': pc.compra.fecha,
+                })
         
         movimientos.append(item_pago)
     
