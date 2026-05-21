@@ -350,7 +350,7 @@ def lista_movimientos(request):
         fecha_hasta = request.GET.get('fecha_hasta', '')
         
         # Consulta base
-        movimientos_qs = Movimiento.objects.select_related('persona', 'tarjeta', 'establecimiento').order_by('-fecha')
+        movimientos_qs = Movimiento.objects.select_related('persona', 'tarjeta', 'establecimiento').order_by('fecha')
         
         # Aplicar filtros
         if buscar:
@@ -760,7 +760,9 @@ def detalle_persona(request, persona_id):
         movimientos_agrupados.append(item_pago)
     
     # Ordenar por fecha (más reciente primero)
-    movimientos_agrupados.sort(key=lambda x: x['fecha'], reverse=True)
+    #movimientos_agrupados.sort(key=lambda x: x['fecha'])
+    movimientos_agrupados.sort(key=lambda x: x.get('fecha') or date.min)
+    
     
     # Compras a meses (para el botón de cargar mensualidad)
     compras_meses = Movimiento.objects.filter(
