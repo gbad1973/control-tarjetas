@@ -38,7 +38,7 @@ INSTALLED_APPS = [
 # ========== MIDDLEWARE ==========
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # Para archivos estáticos en producción
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -68,13 +68,21 @@ TEMPLATES = [
     },
 ]
 
-# ========== BASE DE DATOS (PostgreSQL en Render) ==========
+# ========== BASE DE DATOS (PostgreSQL optimizada) ==========
 DATABASES = {
-    'default': dj_database_url.parse(
-        config('DATABASE_URL'),
-        conn_max_age=600,
-        ssl_require=True  # Necesario para Neon
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        **dj_database_url.parse(config('DATABASE_URL'), conn_max_age=600),
+        'CONN_MAX_AGE': 600,
+        'OPTIONS': {
+            'sslmode': 'require',  # SSL activado (seguro)
+            'connect_timeout': 30,
+            'keepalives': 1,
+            'keepalives_idle': 30,
+            'keepalives_interval': 10,
+            'keepalives_count': 5,
+        }
+    }
 }
 
 # ========== VALIDACIÓN DE CONTRASEÑAS ==========
