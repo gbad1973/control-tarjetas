@@ -125,17 +125,15 @@ def dashboard(request):
                 'id': persona.id,
                 'nombre': persona.nombre,
                 'activo': persona.activo,
-                'saldo_pendiente': deuda_persona,      # ← Solo compras normales no pagadas
+                'saldo_pendiente': deuda_persona,
                 'total_movimientos': compras.count(),
                 'cashback': cashback_persona,
             })
     
     # ===== CÁLCULO DEL DISPONIBLE =====
-    # DISPONIBLE = LÍMITE - (compras normales no pagadas + TODAS las mensualidades)
     total_limite = tarjeta_seleccionada.limite_credito if tarjeta_seleccionada else 0
     total_disponible = total_limite - (saldo_total_tarjeta + total_mensualidades)
     
-    # Total cashback general
     total_cashback = Movimiento.objects.filter(
         tarjeta=tarjeta_seleccionada,
         tipo__in=['COMPRA', 'MENSUALIDAD']
@@ -146,8 +144,8 @@ def dashboard(request):
         'tarjetas': tarjetas,
         'tarjeta_seleccionada': tarjeta_seleccionada,
         'total_limite': total_limite,
-        'total_saldo': saldo_total_tarjeta,           # ← Solo compras normales no pagadas
-        'total_disponible': total_disponible,         # ← Límite - (saldo + todas las mensualidades)
+        'total_saldo': saldo_total_tarjeta,
+        'total_disponible': total_disponible,
         'total_movimientos': Movimiento.objects.filter(tarjeta=tarjeta_seleccionada).count() if tarjeta_seleccionada else 0,
         'total_cashback': total_cashback,
     }
@@ -340,7 +338,6 @@ def lista_movimientos(request):
     from django.core.paginator import Paginator
     
     try:
-        # Leer parámetros
         limit = request.GET.get('limit', '50')
         buscar = request.GET.get('buscar', '')
         tipo = request.GET.get('tipo', '')
@@ -349,10 +346,8 @@ def lista_movimientos(request):
         fecha_desde = request.GET.get('fecha_desde', '')
         fecha_hasta = request.GET.get('fecha_hasta', '')
         
-        # Consulta base
         movimientos_qs = Movimiento.objects.select_related('persona', 'tarjeta', 'establecimiento').order_by('fecha')
         
-        # Aplicar filtros
         if buscar:
             movimientos_qs = movimientos_qs.filter(
                 Q(descripcion__icontains=buscar) | 
@@ -370,10 +365,8 @@ def lista_movimientos(request):
         if fecha_hasta:
             movimientos_qs = movimientos_qs.filter(fecha__lte=fecha_hasta)
         
-        # Contar total
         total_movimientos = movimientos_qs.count()
         
-        # Aplicar límite
         if limit == 'todos':
             movimientos_paginados = movimientos_qs
             limite_usado = 'todos'
@@ -388,7 +381,6 @@ def lista_movimientos(request):
                 movimientos_paginados = movimientos_qs[:50]
                 limite_usado = 50
         
-        # Convertir a formato para el template (cargo/abono)
         movimientos_con_formato = []
         for m in movimientos_paginados:
             if m.tipo in ['COMPRA', 'MENSUALIDAD', 'COMISION', 'INTERES']:
@@ -414,7 +406,6 @@ def lista_movimientos(request):
                 'monto_aplicado': None,
             })
         
-        # Calcular totales
         total_cargos = movimientos_qs.filter(
             tipo__in=['COMPRA', 'MENSUALIDAD', 'COMISION', 'INTERES']
         ).aggregate(total=Sum('monto'))['total'] or 0
@@ -644,9 +635,7 @@ def api_personas_tarjeta(request, tarjeta_id):
     
     return JsonResponse(response_data)
 
-
-
-#*************************.  DETALLE PERSONA.    ***************************
+# ========== DETALLE PERSONA (CORREGIDO) ==========
 
 @login_required
 def detalle_persona(request, persona_id):
@@ -672,12 +661,12 @@ def detalle_persona(request, persona_id):
         tipo='MENSUALIDAD'
     ).select_related('tarjeta', 'establecimiento').order_by('fecha')
     
-    # Obtener todos los pagos de la persona con sus relaciones
+    # Obtener todos los pagos de la persona con sus relaciones (CORREGIDO)
     pagos = Movimiento.objects.filter(
         persona=persona,
         tipo='PAGO'
     ).prefetch_related(
-        Prefetch('pagos_a_compras', queryset=PagoCompra.objects.select_related('compra'))
+        Prefetch('pagos_a_compras', queryset=PagoCompra.objects.select_related('compra__tarjeta', 'compra__establecimiento'))
     ).select_related('tarjeta').order_by('fecha')
     
     # Aplicar filtros
@@ -731,7 +720,7 @@ def detalle_persona(request, persona_id):
                 'cashback': m.monto_cashback,
             })
     
-    # TERCERO: Agregar pagos con sus compras pagadas
+    # TERCERO: Agregar pagos con sus compras pagadas (CORREGIDO)
     for pago in pagos:
         item_pago = {
             'tipo': 'PAGO',
@@ -743,15 +732,18 @@ def detalle_persona(request, persona_id):
             'detalles': []
         }
         
-        for pc in pago.pagos_a_compras.all():
-            if pc.compra:  # ← PROTECCIÓN: verificar que la compra existe
+        # Obtener TODAS las compras pagadas por este pago
+        compras_pagadas = PagoCompra.objects.filter(pago=pago).select_related('compra__tarjeta', 'compra__establecimiento')
+        
+        for pc in compras_pagadas:
+            if pc.compra:
                 item_pago['detalles'].append({
                     'tipo': 'COMPRA_PAGADA',
                     'id': pc.compra.id,
                     'descripcion': pc.compra.descripcion,
-                    'monto': pc.monto_aplicado,
                     'monto_aplicado': pc.monto_aplicado,
-                    'tarjeta': pc.compra.tarjeta if pc.compra.tarjeta else None,  # ← PROTECCIÓN
+                    'monto': pc.monto_aplicado,
+                    'tarjeta': pc.compra.tarjeta,
                     'establecimiento': pc.compra.establecimiento.nombre if pc.compra.establecimiento else '',
                     'cashback': pc.compra.monto_cashback,
                     'fecha': pc.compra.fecha,
@@ -759,10 +751,8 @@ def detalle_persona(request, persona_id):
         
         movimientos_agrupados.append(item_pago)
     
-    # Ordenar por fecha (más reciente primero)
-    #movimientos_agrupados.sort(key=lambda x: x['fecha'])
+    # Ordenar por fecha (más viejo a más nuevo)
     movimientos_agrupados.sort(key=lambda x: x.get('fecha') or date.min)
-    
     
     # Compras a meses (para el botón de cargar mensualidad)
     compras_meses = Movimiento.objects.filter(
@@ -787,8 +777,7 @@ def detalle_persona(request, persona_id):
     }
     return render(request, 'tarjetas_app/detalle_persona.html', context)
 
-
-# **************************************************************************
+# ========== MOVIMIENTOS TARJETA ==========
 @login_required
 def movimientos_tarjeta(request, tarjeta_id):
     tarjeta = get_object_or_404(Tarjeta, id=tarjeta_id, activa=True)
