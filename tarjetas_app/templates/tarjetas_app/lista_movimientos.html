@@ -1,5 +1,4 @@
 
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -530,64 +529,95 @@
                     </thead>
                     <tbody id="tablaMovimientosBody">
                         {% for m in movimientos %}
-                        <tr class="
-                            {% if m.tipo == 'PAGO' %}fila-pago{% endif %}
-                            {% if m.tipo == 'COMPRA' %}fila-compra-pendiente{% endif %}
-                            {% if m.tipo == 'MENSUALIDAD' %}fila-mensualidad{% endif %}
-                            {% if m.tipo == 'COMPRA_PAGADA' %}fila-compra-detalle{% endif %}
-                        ">
-                            
-                            <td>{% if m.fecha and not m.is_detalle %}{{ m.fecha|date:"d/m/Y" }}{% endif %}</td>
-                            <td class="{% if m.is_detalle %}descripcion-cell{% endif %}">
-                                <span class="icono-movimiento">
-                                    {% if m.tipo == 'PAGO' %}💰
-                                    {% elif m.tipo == 'COMPRA' %}🛒
-                                    {% elif m.tipo == 'COMPRA_PAGADA' %}↳
-                                    {% endif %}
-                                </span>
-                                {{ m.descripcion }}
-                                {% if m.monto_aplicado %}
-                                    <span class="aplicado-badge">Aplicado: ${{ m.monto_aplicado|floatformat:2|intcomma }}</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ m.persona.nombre }}</td>
-                            <td>{{ m.tarjeta.banco }} - ****{{ m.tarjeta.numero|slice:"-4:" }}</td>
-                            <td>
-                                <span class="tipo-badge 
-                                    {% if m.tipo == 'PAGO' %}tipo-pago
-                                    {% elif m.tipo == 'COMPRA' %}tipo-compra
-                                    {% elif m.tipo == 'COMPRA_PAGADA' %}tipo-pagada
-                                    {% endif %}">
-                                    {% if m.tipo == 'PAGO' %}PAGO
-                                    {% elif m.tipo == 'COMPRA' %}COMPRA PENDIENTE
-                                    {% elif m.tipo == 'COMPRA_PAGADA' %}COMPRA PAGADA
-                                    {% elif m.tipo == 'MENSUALIDAD' %}MENSUALIDAD
-                                    {% endif %}
-                                </span>
-                            </td>
-                            <td class="text-end">
-                                {% if m.cargo %}
-                                    <span class="monto-negativo">${{ m.cargo|floatformat:2|intcomma }}</span>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-end">
-                                {% if m.abono %}
-                                    <span class="monto-positivo">${{ m.abono|floatformat:2|intcomma }}</span>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if not m.is_detalle %}
-                                <div class="acciones">
-                                    <a href="{% url 'editar_movimiento' m.id %}" class="btn-edit">✏️</a>
-                                    <a href="{% url 'eliminar_movimiento' m.id %}" class="btn-delete">🗑️</a>
-                                </div>
-                                {% endif %}
-                            </td>
-                        </tr>
+                            {% if m.tipo == 'PAGO' %}
+                                <!-- FILA DE PAGO PRINCIPAL -->
+                                <tr class="fila-pago">
+                                    <td>{{ m.fecha|date:"d/m/Y" }}</td>
+                                    <td>
+                                        <span class="icono-movimiento">💰</span>
+                                        {{ m.descripcion }}
+                                    </td>
+                                    <td>{{ m.persona.nombre }}</td>
+                                    <td>{{ m.tarjeta.banco }} - ****{{ m.tarjeta.numero|slice:"-4:" }}</td>
+                                    <td>
+                                        <span class="tipo-badge tipo-pago">PAGO</span>
+                                    </td>
+                                    <td class="text-end">-</td>
+                                    <td class="text-end monto-positivo">${{ m.monto|floatformat:2|intcomma }}</td>
+                                    <td>
+                                        <div class="acciones">
+                                            <a href="{% url 'editar_movimiento' m.id %}" class="btn-edit">✏️</a>
+                                            <a href="{% url 'eliminar_movimiento' m.id %}" class="btn-delete">🗑️</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                
+                                <!-- COMPRAS PAGADAS POR ESTE PAGO (detalles) -->
+                                {% for detalle in m.detalles %}
+                                <tr class="fila-compra-detalle">
+                                    <td></td>
+                                    <td class="descripcion-cell">
+                                        <span class="icono-movimiento">↳</span>
+                                        {{ detalle.descripcion }}
+                                        <span class="aplicado-badge">Aplicado: ${{ detalle.monto_aplicado|floatformat:2|intcomma }}</span>
+                                    </td>
+                                    <td>{{ detalle.persona.nombre }}</td>
+                                    <td>{{ detalle.tarjeta.banco }} - ****{{ detalle.tarjeta.numero|slice:"-4:" }}</td>
+                                    <td>
+                                        <span class="tipo-badge tipo-pagada">COMPRA PAGADA</span>
+                                    </td>
+                                    <td class="text-end monto-negativo">${{ detalle.monto|floatformat:2|intcomma }}</td>
+                                    <td class="text-end">-</td>
+                                    <td></td>
+                                </tr>
+                                {% endfor %}
+                                
+                            {% elif m.tipo == 'COMPRA_PENDIENTE' %}
+                                <!-- COMPRA NO PAGADA -->
+                                <tr class="fila-compra-pendiente">
+                                    <td>{{ m.fecha|date:"d/m/Y" }}</td>
+                                    <td>
+                                        <span class="icono-movimiento">🛒</span>
+                                        {{ m.descripcion }}
+                                    </td>
+                                    <td>{{ m.persona.nombre }}</td>
+                                    <td>{{ m.tarjeta.banco }} - ****{{ m.tarjeta.numero|slice:"-4:" }}</td>
+                                    <td>
+                                        <span class="tipo-badge tipo-compra">COMPRA PENDIENTE</span>
+                                    </td>
+                                    <td class="text-end monto-negativo">${{ m.saldo|floatformat:2|intcomma }}</td>
+                                    <td class="text-end">-</td>
+                                    <td>
+                                        <div class="acciones">
+                                            <a href="{% url 'editar_movimiento' m.id %}" class="btn-edit">✏️</a>
+                                            <a href="{% url 'eliminar_movimiento' m.id %}" class="btn-delete">🗑️</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                
+                            {% elif m.tipo == 'MENSUALIDAD' %}
+                                <!-- MENSUALIDAD -->
+                                <tr class="fila-mensualidad">
+                                    <td>{{ m.fecha|date:"d/m/Y" }}</td>
+                                    <td>
+                                        <span class="icono-movimiento">📅</span>
+                                        {{ m.descripcion }}
+                                    </td>
+                                    <td>{{ m.persona.nombre }}</td>
+                                    <td>{{ m.tarjeta.banco }} - ****{{ m.tarjeta.numero|slice:"-4:" }}</td>
+                                    <td>
+                                        <span class="tipo-badge tipo-mensualidad">MENSUALIDAD</span>
+                                    </td>
+                                    <td class="text-end monto-negativo">${{ m.saldo|floatformat:2|intcomma }}</td>
+                                    <td class="text-end">-</td>
+                                    <td>
+                                        <div class="acciones">
+                                            <a href="{% url 'editar_movimiento' m.id %}" class="btn-edit">✏️</a>
+                                            <a href="{% url 'eliminar_movimiento' m.id %}" class="btn-delete">🗑️</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endif %}
                         {% endfor %}
                     </tbody>
                     <tfoot style="background: #1e40af; color: white;">
