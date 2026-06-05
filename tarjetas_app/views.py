@@ -46,30 +46,42 @@ def crear_usuario_admin(request):
 def dashboard(request):
     from django.db.models import Sum
     
+    # Obtener todas las tarjetas activas
     tarjetas = Tarjeta.objects.filter(activa=True)
-    tarjeta_id = request.GET.get('tarjeta')
     
+    # Diccionario para acumular totales por persona (a través de todas las tarjetas)
+    personas_data = {}
+    
+    # Totales generales
+    total_limite_general = 0
+    total_saldo_general = 0
+    total_mensualidades_general = 0
+    total_movimientos_general = 0
+    total_cashback_general = 0
+    
+    # Para el selector de tarjeta (opcional, si quieres ver individual)
+    tarjeta_id = request.GET.get('tarjeta')
     tarjeta_seleccionada = None
     if tarjeta_id:
         tarjeta_seleccionada = get_object_or_404(Tarjeta, id=tarjeta_id)
     elif tarjetas.exists():
         tarjeta_seleccionada = tarjetas.first()
     
-    personas = []
-    saldo_total_tarjeta = 0      # Solo compras normales no pagadas
-    total_mensualidades = 0      # Todas las mensualidades (generadas + futuras)
-    
-    if tarjeta_seleccionada:
-        usuarios = tarjeta_seleccionada.usuarios.filter(activo=True)
+    # Recorrer cada tarjeta activa
+    for tarjeta in tarjetas:
+        total_limite_general += tarjeta.limite_credito
+        
+        # Usuarios de esta tarjeta
+        usuarios = tarjeta.usuarios.filter(activo=True)
         
         for persona in usuarios:
-            deuda_persona = 0           # para el SALDO (solo compras normales)
-            mensualidades_persona = 0   # para el DISPONIBLE
+            deuda_persona = 0
+            mensualidades_persona = 0
             
-            # ===== 1. COMPRAS NORMALES NO PAGADAS (esto va al SALDO) =====
+            # Compras normales NO pagadas de esta tarjeta
             compras = Movimiento.objects.filter(
                 persona=persona,
-                tarjeta=tarjeta_seleccionada,
+                tarjeta=tarjeta,
                 tipo='COMPRA',
                 es_a_meses=False
             )
@@ -79,10 +91,10 @@ def dashboard(request):
                 if saldo > 0:
                     deuda_persona += saldo
             
-            # ===== 2. MENSUALIDADES YA GENERADAS (esto va al DISPONIBLE) =====
+            # Mensualidades YA generadas
             mensualidades = Movimiento.objects.filter(
                 persona=persona,
-                tarjeta=tarjeta_seleccionada,
+                tarjeta=tarjeta,
                 tipo='MENSUALIDAD'
             )
             for m in mensualidades:
@@ -91,46 +103,75 @@ def dashboard(request):
                 if saldo > 0:
                     mensualidades_persona += saldo
             
-            # ===== 3. MENSUALIDADES FUTURAS de compras a meses (esto va al DISPONIBLE) =====
+            # Mensualidades FUTURAS de compras a meses
             compras_meses = Movimiento.objects.filter(
                 persona=persona,
-                tarjeta=tarjeta_seleccionada,
+                tarjeta=tarjeta,
                 tipo='COMPRA',
                 es_a_meses=True
             )
             for c in compras_meses:
-                # Contar cuántas mensualidades ya se generaron
                 mensualidades_generadas = Movimiento.objects.filter(
                     tipo='MENSUALIDAD',
                     descripcion__icontains=f"compra {c.id}"
                 ).count()
-                
-                # Calcular cuántas mensualidades faltan por generar
                 meses_pendientes = c.numero_meses - mensualidades_generadas
                 if meses_pendientes > 0:
                     mensualidades_persona += c.monto_mensual * meses_pendientes
             
-            # Acumular totales
-            saldo_total_tarjeta += deuda_persona
-            total_mensualidades += mensualidades_persona
+            # Acumular por persona (sumando todas las tarjetas)
+            if persona.id not in personas_data:
+                personas_data[persona.id] = {
+                    'id': persona.id,
+                    'nombre': persona.nombre,
+                    'activo': persona.activo,
+                    'saldo_pendiente': 0,
+                    'total_movimientos': 0,
+                    'cashback': 0,
+                }
             
-            # Cashback de la persona
+            personas_data[persona.id]['saldo_pendiente'] += deuda_persona
+            personas_data[persona.id]['total_movimientos'] += compras.count()
+            
+            # Cashback de la persona en esta tarjeta
             cashback_persona = Movimiento.objects.filter(
                 persona=persona,
-                tarjeta=tarjeta_seleccionada,
+                tarjeta=tarjeta,
                 tipo__in=['COMPRA', 'MENSUALIDAD']
             ).aggregate(total=Sum('monto_cashback'))['total'] or 0
+            personas_data[persona.id]['cashback'] += cashback_persona
             
-            personas.append({
-                'id': persona.id,
-                'nombre': persona.nombre,
-                'activo': persona.activo,
-                'saldo_pendiente': deuda_persona,
-                'total_movimientos': compras.count(),
-                'cashback': cashback_persona,
-            })
+            # Acumular totales generales
+            total_saldo_general += deuda_persona
+            total_mensualidades_general += mensualidades_persona
+        
+        # Movimientos y cashback general
+        total_movimientos_general += Movimiento.objects.filter(tarjeta=tarjeta).count()
+        total_cashback_general += Movimiento.objects.filter(
+            tarjeta=tarjeta,
+            tipo__in=['COMPRA', 'MENSUALIDAD']
+        ).aggregate(total=Sum('monto_cashback'))['total'] or 0
     
-    # ===== CÁLCULO DEL DISPONIBLE =====
+    # Calcular disponible general
+    total_disponible_general = total_limite_general - (total_saldo_general + total_mensualidades_general)
+    
+    # Convertir diccionario a lista
+    personas = list(personas_data.values())
+    
+    context = {
+        'personas': personas,
+        'tarjetas': tarjetas,
+        'tarjeta_seleccionada': tarjeta_seleccionada,
+        'total_limite': total_limite_general,
+        'total_saldo': total_saldo_general,
+        'total_disponible': total_disponible_general,
+        'total_movimientos': total_movimientos_general,
+        'total_cashback': total_cashback_general,
+    }
+    return render(request, 'tarjetas_app/dashboard.html', context)
+
+
+# ===== CÁLCULO DEL DISPONIBLE =====
     total_limite = tarjeta_seleccionada.limite_credito if tarjeta_seleccionada else 0
     total_disponible = total_limite - (saldo_total_tarjeta + total_mensualidades)
     
