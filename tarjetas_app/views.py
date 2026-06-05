@@ -49,7 +49,21 @@ def dashboard(request):
     # Obtener todas las tarjetas activas
     tarjetas = Tarjeta.objects.filter(activa=True)
     
-    # Diccionario para acumular totales por persona (a través de todas las tarjetas)
+    # Si no hay tarjetas, mostrar mensaje
+    if not tarjetas.exists():
+        context = {
+            'personas': [],
+            'tarjetas': [],
+            'tarjeta_seleccionada': None,
+            'total_limite': 0,
+            'total_saldo': 0,
+            'total_disponible': 0,
+            'total_movimientos': 0,
+            'total_cashback': 0,
+        }
+        return render(request, 'tarjetas_app/dashboard.html', context)
+    
+    # Diccionario para acumular totales por persona
     personas_data = {}
     
     # Totales generales
@@ -59,26 +73,17 @@ def dashboard(request):
     total_movimientos_general = 0
     total_cashback_general = 0
     
-    # Para el selector de tarjeta (opcional, si quieres ver individual)
-    tarjeta_id = request.GET.get('tarjeta')
-    tarjeta_seleccionada = None
-    if tarjeta_id:
-        tarjeta_seleccionada = get_object_or_404(Tarjeta, id=tarjeta_id)
-    elif tarjetas.exists():
-        tarjeta_seleccionada = tarjetas.first()
-    
     # Recorrer cada tarjeta activa
     for tarjeta in tarjetas:
         total_limite_general += tarjeta.limite_credito
         
-        # Usuarios de esta tarjeta
         usuarios = tarjeta.usuarios.filter(activo=True)
         
         for persona in usuarios:
             deuda_persona = 0
             mensualidades_persona = 0
             
-            # Compras normales NO pagadas de esta tarjeta
+            # Compras normales NO pagadas
             compras = Movimiento.objects.filter(
                 persona=persona,
                 tarjeta=tarjeta,
@@ -115,11 +120,11 @@ def dashboard(request):
                     tipo='MENSUALIDAD',
                     descripcion__icontains=f"compra {c.id}"
                 ).count()
-                meses_pendientes = c.numero_meses - mensualidades_generadas
+                meses_pendientes = max(0, c.numero_meses - mensualidades_generadas)
                 if meses_pendientes > 0:
                     mensualidades_persona += c.monto_mensual * meses_pendientes
             
-            # Acumular por persona (sumando todas las tarjetas)
+            # Acumular por persona
             if persona.id not in personas_data:
                 personas_data[persona.id] = {
                     'id': persona.id,
@@ -133,7 +138,7 @@ def dashboard(request):
             personas_data[persona.id]['saldo_pendiente'] += deuda_persona
             personas_data[persona.id]['total_movimientos'] += compras.count()
             
-            # Cashback de la persona en esta tarjeta
+            # Cashback de la persona
             cashback_persona = Movimiento.objects.filter(
                 persona=persona,
                 tarjeta=tarjeta,
@@ -157,6 +162,17 @@ def dashboard(request):
     
     # Convertir diccionario a lista
     personas = list(personas_data.values())
+    
+    # Para el selector de tarjeta (opcional)
+    tarjeta_id = request.GET.get('tarjeta')
+    tarjeta_seleccionada = None
+    if tarjeta_id:
+        try:
+            tarjeta_seleccionada = Tarjeta.objects.get(id=tarjeta_id, activa=True)
+        except Tarjeta.DoesNotExist:
+            tarjeta_seleccionada = tarjetas.first()
+    else:
+        tarjeta_seleccionada = tarjetas.first()
     
     context = {
         'personas': personas,
