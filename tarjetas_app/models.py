@@ -1,3 +1,4 @@
+
 # Create your models here.
 from django.db import models
 from django.contrib.auth.models import User
@@ -45,6 +46,9 @@ class Tarjeta(models.Model):
     titular = models.ForeignKey(Persona, on_delete=models.CASCADE, related_name='tarjetas_titular', verbose_name="Titular principal", null=True, blank=True)
     fecha_vencimiento_pago = models.IntegerField(help_text="Día del mes (1-31) para el pago", default=15)
     
+    # ===== CAMPO DÍA DE CORTE =====
+    dia_corte = models.IntegerField(default=15, help_text="Día del mes en que se genera el estado de cuenta (1-31)")
+    
     fecha_vencimiento_tarjeta = models.DateField(
         verbose_name="Fecha de vencimiento de la tarjeta (MM/AA)",
         null=True,
@@ -78,7 +82,7 @@ class Tarjeta(models.Model):
             tarjeta=self,
             tipo='COMPRA',
             es_a_meses=True,
-            meses_pagados__lt=F('numero_meses')  # las que no están completamente pagadas
+            meses_pagados__lt=F('numero_meses')
         )
         
         for compra in compras_activas:
@@ -173,7 +177,7 @@ class Movimiento(models.Model):
             models.Index(fields=['tipo']),
             models.Index(fields=['persona']),
             models.Index(fields=['tarjeta']),
-             models.Index(fields=['fecha', 'tipo']),
+            models.Index(fields=['fecha', 'tipo']),
         ]
     
     def __str__(self):
@@ -185,22 +189,12 @@ class Movimiento(models.Model):
             return (self.monto * self.establecimiento.porcentaje_cashback) / 100
         return 0
     
-    # ===== MÉTODO SAVE CORREGIDO - ELIMINADA LA CREACIÓN AUTOMÁTICA =====
-    #def save(self, *args, **kwargs):
-    #    """Guarda el movimiento sin crear mensualidades automáticas"""
-    #    super().save(*args, **kwargs)
-        
-        # Actualizar saldo de la tarjeta después de guardar
-    #    if hasattr(self, 'tarjeta') and self.tarjeta:
-    #        self.tarjeta.actualizar_saldo()
-    
-    
     def save(self, *args, **kwargs):
         # Calcular cashback SOLO para compras NORMALES (NO a meses)
         if self.tipo == 'COMPRA' and self.establecimiento and not self.es_a_meses:
             self.monto_cashback = self.calcular_cashback()
         elif self.tipo == 'COMPRA' and self.es_a_meses:
-            self.monto_cashback = 0  # ← Las compras a meses NO generan cashback
+            self.monto_cashback = 0
         super().save(*args, **kwargs)
         
         if hasattr(self, 'tarjeta') and self.tarjeta:

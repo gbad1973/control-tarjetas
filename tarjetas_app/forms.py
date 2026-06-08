@@ -30,6 +30,7 @@ class PersonaForm(forms.ModelForm):
             'telefono': 'Teléfono',
         }
 
+
 class TarjetaForm(forms.ModelForm):
     # Campo personalizado para la fecha MM/AA
     fecha_vencimiento_tarjeta_mm_aa = forms.CharField(
@@ -43,10 +44,26 @@ class TarjetaForm(forms.ModelForm):
         help_text='Formato: MM/AA (Ej: 12/25 para Diciembre 2025)'
     )
     
+    # Campo día de corte
+    dia_corte = forms.IntegerField(
+        label='Día de corte',
+        min_value=1,
+        max_value=31,
+        required=True,
+        initial=15,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: 15',
+            'min': '1',
+            'max': '31'
+        }),
+        help_text='Día del mes en que se genera el estado de cuenta (1-31)'
+    )
+    
     class Meta:
         model = Tarjeta
         fields = ['numero', 'tipo', 'banco', 'titular', 'limite_credito', 
-                 'fecha_vencimiento_pago', 'fecha_vencimiento_tarjeta_mm_aa']
+                 'fecha_vencimiento_pago', 'fecha_vencimiento_tarjeta_mm_aa', 'dia_corte']
         widgets = {
             'numero': forms.TextInput(attrs={
                 'class': 'form-control', 
@@ -87,8 +104,10 @@ class TarjetaForm(forms.ModelForm):
             'titular': 'Titular',
             'limite_credito': 'Límite de crédito',
             'fecha_vencimiento_pago': 'Día de vencimiento de pago (1-31)',
+            'dia_corte': 'Día de corte',
         }
-    
+        
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Si estamos editando, establecer el valor inicial para fecha_vencimiento_tarjeta_mm_aa

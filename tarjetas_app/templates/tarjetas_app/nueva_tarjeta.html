@@ -702,7 +702,17 @@
                         {% endif %}
                         <div class="help-text">Día del mes para pagar la tarjeta (1-31)</div>
                     </div>
-                    
+
+                    <!-- ===== AGREGAR AQUÍ EL CAMPO DÍA DE CORTE ===== -->
+                    <div class="form-group">
+                        <label for="id_dia_corte">📅 Día de Corte</label>
+                        {{ form.dia_corte }}
+                        {% if form.dia_corte.errors %}
+                            <div class="error-message">{{ form.dia_corte.errors }}</div>
+                        {% endif %}
+                        <div class="help-text">Día del mes en que se genera el estado de cuenta (1-31)</div>
+                    </div>
+
                     <!-- Fecha vencimiento tarjeta (MM/AA) -->
                     <div class="form-group">
                         <label for="id_fecha_vencimiento_tarjeta_mm_aa">⏰ Fecha Vencimiento Tarjeta</label>
