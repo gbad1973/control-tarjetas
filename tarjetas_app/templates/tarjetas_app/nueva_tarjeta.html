@@ -703,7 +703,7 @@
                         <div class="help-text">Día del mes para pagar la tarjeta (1-31)</div>
                     </div>
 
-                    <!-- ===== AGREGAR AQUÍ EL CAMPO DÍA DE CORTE ===== -->
+                    <!-- Día de corte -->
                     <div class="form-group">
                         <label for="id_dia_corte">📅 Día de Corte</label>
                         {{ form.dia_corte }}
@@ -711,6 +711,31 @@
                             <div class="error-message">{{ form.dia_corte.errors }}</div>
                         {% endif %}
                         <div class="help-text">Día del mes en que se genera el estado de cuenta (1-31)</div>
+                    </div>
+
+                    <!-- ===== NUEVOS CAMPOS PARA TARJETAS ADICIONALES ===== -->
+                    <!-- ¿Es tarjeta adicional? -->
+                    <div class="form-group">
+                        <div class="form-check">
+                            {{ form.es_adicional }}
+                            <label class="form-check-label" for="id_es_adicional">
+                                🔗 ¿Es tarjeta adicional?
+                            </label>
+                        </div>
+                        {% if form.es_adicional.errors %}
+                            <div class="error-message">{{ form.es_adicional.errors }}</div>
+                        {% endif %}
+                        <div class="help-text">Marca si esta tarjeta es adicional de otra</div>
+                    </div>
+
+                    <!-- Seleccionar tarjeta principal (se muestra solo si es adicional) -->
+                    <div class="form-group" id="grupo_tarjeta_principal" style="display: none;">
+                        <label for="id_tarjeta_principal">🏦 Tarjeta principal</label>
+                        {{ form.tarjeta_principal }}
+                        {% if form.tarjeta_principal.errors %}
+                            <div class="error-message">{{ form.tarjeta_principal.errors }}</div>
+                        {% endif %}
+                        <div class="help-text">Selecciona la tarjeta principal a la que pertenece esta adicional</div>
                     </div>
 
                     <!-- Fecha vencimiento tarjeta (MM/AA) -->
@@ -797,6 +822,29 @@
         // ===== VARIABLES GLOBALES =====
         let usuariosSeleccionados = new Set();
         let titularId = null;
+        
+        // ===== MOSTRAR/OCULTAR SELECTOR DE TARJETA PRINCIPAL =====
+        document.addEventListener('DOMContentLoaded', function() {
+            const esAdicionalCheckbox = document.getElementById('id_es_adicional');
+            const grupoPrincipal = document.getElementById('grupo_tarjeta_principal');
+            
+            if (esAdicionalCheckbox && grupoPrincipal) {
+                // Función para mostrar/ocultar
+                function toggleTarjetaPrincipal() {
+                    if (esAdicionalCheckbox.checked) {
+                        grupoPrincipal.style.display = 'block';
+                    } else {
+                        grupoPrincipal.style.display = 'none';
+                    }
+                }
+                
+                // Ejecutar al cargar
+                toggleTarjetaPrincipal();
+                
+                // Ejecutar al cambiar
+                esAdicionalCheckbox.addEventListener('change', toggleTarjetaPrincipal);
+            }
+        });
         
         // ===== VISTA PREVIA EN TIEMPO REAL =====
         function actualizarVistaPrevia() {
