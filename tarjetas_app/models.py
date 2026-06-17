@@ -45,6 +45,18 @@ class Tarjeta(models.Model):
     banco = models.CharField(max_length=100, verbose_name="Nombre del banco")
     titular = models.ForeignKey(Persona, on_delete=models.CASCADE, related_name='tarjetas_titular', verbose_name="Titular principal", null=True, blank=True)
     fecha_vencimiento_pago = models.IntegerField(help_text="Día del mes (1-31) para el pago", default=15)
+    es_principal = models.BooleanField(default=True, verbose_name="¿Es tarjeta principal?")
+    es_adicional = models.BooleanField(default=False, verbose_name="¿Es tarjeta adicional?")
+    
+    # ===== CAMPO PARA RELACIONAR TARJETAS ADICIONALES CON SU PRINCIPAL =====
+    tarjeta_principal = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='tarjetas_adicionales',
+        verbose_name="Tarjeta principal a la que pertenece"
+    )
     
     # ===== CAMPO DÍA DE CORTE =====
     dia_corte = models.IntegerField(default=15, help_text="Día del mes en que se genera el estado de cuenta (1-31)")
@@ -70,6 +82,12 @@ class Tarjeta(models.Model):
     
     def __str__(self):
         return f"{self.banco} - ****{self.numero[-4:]}"
+    
+    def obtener_tarjetas_para_saldo(self):
+        """Devuelve la tarjeta principal (si es adicional) o la misma (si es principal)"""
+        if self.es_adicional and self.tarjeta_principal:
+            return [self.tarjeta_principal] + list(self.tarjeta_principal.tarjetas_adicionales.filter(activa=True))
+        return [self]
     
     def saldo_disponible(self):
         """Calcula el saldo disponible considerando retenciones de compras a meses"""
