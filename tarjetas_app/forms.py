@@ -61,7 +61,7 @@ class TarjetaForm(forms.ModelForm):
         help_text='Día del mes en que se genera el estado de cuenta (1-31)'
     )
     
-    # ===== CAMPO PARA INDICAR SI ES TARJETA PRINCIPAL =====
+    # Campo para indicar si es tarjeta principal
     es_principal = forms.BooleanField(
         label='¿Es tarjeta principal?',
         required=False,
@@ -69,7 +69,7 @@ class TarjetaForm(forms.ModelForm):
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_es_principal'})
     )
     
-    # ===== CAMPO PARA INDICAR SI ES TARJETA ADICIONAL =====
+    # Campo para indicar si es tarjeta adicional
     es_adicional = forms.BooleanField(
         label='¿Es tarjeta adicional?',
         required=False,
@@ -77,7 +77,7 @@ class TarjetaForm(forms.ModelForm):
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_es_adicional'})
     )
     
-    # ===== CAMPO PARA SELECCIONAR TARJETA PRINCIPAL (si es adicional) =====
+    # Campo para seleccionar tarjeta principal (si es adicional)
     tarjeta_principal = forms.ModelChoiceField(
         queryset=Tarjeta.objects.filter(es_principal=True, activa=True),
         label='Tarjeta principal',
@@ -163,9 +163,7 @@ class TarjetaForm(forms.ModelForm):
     def clean_fecha_vencimiento_tarjeta_mm_aa(self):
         data = self.cleaned_data['fecha_vencimiento_tarjeta_mm_aa']
         try:
-            # Convertir MM/AA a fecha (asumiendo día 1 del mes)
             mes, ano = data.split('/')
-            # Convertir AA a AAAA (asumiendo años 2000+)
             ano = int(ano) + 2000
             from datetime import date
             return date(ano, int(mes), 1)
@@ -178,19 +176,11 @@ class TarjetaForm(forms.ModelForm):
         tarjeta_principal = cleaned_data.get('tarjeta_principal')
         es_principal = cleaned_data.get('es_principal')
         
-        # Validar: si es adicional, debe tener una tarjeta principal
         if es_adicional and not tarjeta_principal:
             self.add_error('tarjeta_principal', 'Debes seleccionar una tarjeta principal')
         
-        # Validar: si es principal, no puede ser adicional
         if es_principal and es_adicional:
             self.add_error('es_adicional', 'Una tarjeta no puede ser principal y adicional al mismo tiempo')
-        
-        # Si es adicional, el límite se toma de la principal (se ignora el que ponga)
-        if es_adicional and tarjeta_principal:
-            # Forzar el límite a 0 o mantener el de la principal?
-            # Por ahora, dejamos que el usuario ingrese el límite de la adicional
-            pass
         
         return cleaned_data
 

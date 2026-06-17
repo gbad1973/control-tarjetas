@@ -6,7 +6,6 @@ from django.utils import timezone
 from datetime import date, timedelta
 
 class Persona(models.Model):
-    """Personas que usan las tarjetas"""
     nombre = models.CharField(max_length=100, verbose_name="Nombre completo")
     activo = models.BooleanField(default=True, verbose_name="Activo")
     fecha_registro = models.DateField(auto_now_add=True, verbose_name="Fecha de registro")
@@ -22,7 +21,6 @@ class Persona(models.Model):
         return f"{self.nombre} ({'Activo' if self.activo else 'Inactivo'})"
     
     def deuda_total(self):
-        """Calcula la deuda total de esta persona en todas las tarjetas"""
         total = 0
         for movimiento in self.movimientos.filter(tipo__in=['COMPRA', 'COMISION', 'INTERES']):
             total += movimiento.monto
@@ -32,7 +30,6 @@ class Persona(models.Model):
 
 
 class Tarjeta(models.Model):
-    """Tarjetas de crédito"""
     TIPO_CHOICES = [
         ('VISA', 'Visa'),
         ('MASTERCARD', 'MasterCard'),
@@ -48,7 +45,7 @@ class Tarjeta(models.Model):
     es_principal = models.BooleanField(default=True, verbose_name="¿Es tarjeta principal?")
     es_adicional = models.BooleanField(default=False, verbose_name="¿Es tarjeta adicional?")
     
-    # ===== CAMPO PARA RELACIONAR TARJETAS ADICIONALES CON SU PRINCIPAL =====
+    # Relación para tarjetas adicionales
     tarjeta_principal = models.ForeignKey(
         'self',
         on_delete=models.CASCADE,
@@ -58,7 +55,6 @@ class Tarjeta(models.Model):
         verbose_name="Tarjeta principal a la que pertenece"
     )
     
-    # ===== CAMPO DÍA DE CORTE =====
     dia_corte = models.IntegerField(default=15, help_text="Día del mes en que se genera el estado de cuenta (1-31)")
     
     fecha_vencimiento_tarjeta = models.DateField(
@@ -83,19 +79,11 @@ class Tarjeta(models.Model):
     def __str__(self):
         return f"{self.banco} - ****{self.numero[-4:]}"
     
-    def obtener_tarjetas_para_saldo(self):
-        """Devuelve la tarjeta principal (si es adicional) o la misma (si es principal)"""
-        if self.es_adicional and self.tarjeta_principal:
-            return [self.tarjeta_principal] + list(self.tarjeta_principal.tarjetas_adicionales.filter(activa=True))
-        return [self]
-    
     def saldo_disponible(self):
-        """Calcula el saldo disponible considerando retenciones de compras a meses"""
         from .models import Movimiento
         from django.db.models import Sum, F
         
         retenciones = 0
-        # Por cada compra a meses activa
         compras_activas = Movimiento.objects.filter(
             tarjeta=self,
             tipo='COMPRA',
@@ -104,38 +92,31 @@ class Tarjeta(models.Model):
         )
         
         for compra in compras_activas:
-            # La retención es el monto total - lo ya pagado
             retenciones += compra.monto - (compra.monto_mensual * compra.meses_pagados)
         
         return self.limite_credito - self.saldo_actual - retenciones
     
     def actualizar_saldo(self):
-        """Actualiza el saldo actual sumando todos los movimientos que SÍ afectan el saldo"""
         from django.db.models import Sum
         
-        # 1. Compras normales (excluye compras a meses)
         cargos_normales = self.movimientos.filter(
             tipo__in=['COMPRA', 'COMISION', 'INTERES'],
             es_a_meses=False
         ).aggregate(total=Sum('monto'))['total'] or 0
         
-        # 2. MENSUALIDADES (¡SÍ AFECTAN EL SALDO!)
         mensualidades = self.movimientos.filter(
             tipo='MENSUALIDAD'
         ).aggregate(total=Sum('monto'))['total'] or 0
         
-        # 3. Abonos (pagos y cashback)
         abonos = self.movimientos.filter(
             tipo__in=['PAGO', 'CASHBACK']
         ).aggregate(total=Sum('monto'))['total'] or 0
         
-        # El saldo actual es la suma de lo que afecta
         self.saldo_actual = cargos_normales + mensualidades - abonos
         self.save() 
 
 
 class Establecimiento(models.Model):
-    """Establecimientos donde se hacen compras"""
     nombre = models.CharField(max_length=200, verbose_name="Nombre del establecimiento")
     descripcion = models.TextField(blank=True, verbose_name="Descripción")
     porcentaje_cashback = models.DecimalField(
@@ -157,7 +138,6 @@ class Establecimiento(models.Model):
 
 
 class Movimiento(models.Model):
-    """Movimientos de las tarjetas (cargos y abonos)"""
     TIPO_CHOICES = [
         ('COMPRA', 'Compra'),
         ('PAGO', 'Pago'),
@@ -202,13 +182,11 @@ class Movimiento(models.Model):
         return f"{self.get_tipo_display()} - ${self.monto} - {self.persona.nombre}"
     
     def calcular_cashback(self):
-        """Calcula automáticamente el cashback si es una compra"""
         if self.tipo == 'COMPRA' and self.establecimiento and self.establecimiento.porcentaje_cashback > 0:
             return (self.monto * self.establecimiento.porcentaje_cashback) / 100
         return 0
     
     def save(self, *args, **kwargs):
-        # Calcular cashback SOLO para compras NORMALES (NO a meses)
         if self.tipo == 'COMPRA' and self.establecimiento and not self.es_a_meses:
             self.monto_cashback = self.calcular_cashback()
         elif self.tipo == 'COMPRA' and self.es_a_meses:
@@ -219,29 +197,24 @@ class Movimiento(models.Model):
             self.tarjeta.actualizar_saldo()
     
     def es_cargo(self):
-        """Determina si es un cargo (compra, comisión, interés)"""
         return self.tipo in ['COMPRA', 'COMISION', 'INTERES']
     
     def es_abono(self):
-        """Determina si es un abono (pago, cashback)"""
         return self.tipo in ['PAGO', 'CASHBACK']
     
     def mes_actual(self):
-        """Devuelve el número de mes en curso (1/6, 2/6, etc.)"""
         if not self.es_a_meses:
             return None
         return f"{self.meses_pagados + 1}/{self.numero_meses}"
     
     @property
     def saldo_pendiente(self):
-        """Calcula el saldo pendiente si es una compra"""
         if self.tipo not in ['COMPRA', 'COMISION', 'INTERES']:
             return 0
         total_pagado = self.pagos_recibidos.aggregate(total=models.Sum('monto_aplicado'))['total'] or 0
         return self.monto - total_pagado
 
 class LiberacionMensualidad(models.Model):
-    """Registro de cada mensualidad cargada"""
     movimiento = models.ForeignKey(Movimiento, on_delete=models.CASCADE, related_name='liberaciones')
     fecha = models.DateField(auto_now_add=True)
     monto = models.DecimalField(max_digits=10, decimal_places=2)
@@ -252,7 +225,6 @@ class LiberacionMensualidad(models.Model):
 
 
 class PagoCompra(models.Model):
-    """Relaciona un pago con una compra y guarda el monto aplicado"""
     pago = models.ForeignKey('Movimiento', on_delete=models.CASCADE, related_name='pagos_a_compras')
     compra = models.ForeignKey('Movimiento', on_delete=models.CASCADE, related_name='pagos_recibidos')
     monto_aplicado = models.DecimalField(max_digits=10, decimal_places=2)
